@@ -10,6 +10,9 @@ use crate::App;
 use crate::identity::Session;
 use crate::util::encode_uri_component;
 
+/// コミットメッセージの 1 行目の長さの上限
+const MAX_SUMMARY_CHARS: usize = 200;
+
 fn request(app: &App, method: reqwest::Method, url: String) -> reqwest::RequestBuilder {
     app.http
         .request(method, url)
@@ -82,9 +85,22 @@ pub struct Commit<'a> {
     pub user: &'a Session,
 }
 
+/// コミットメッセージの 1 行目だけを使う。だれの編集かは下の trailer だけが示す (別の人の名前を足させない)
+fn summary_line(message: &str) -> String {
+    message
+        .lines()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_SUMMARY_CHARS)
+        .collect()
+}
+
 /// 原稿を保存してコミットする。戻り値は (コミットの SHA, ファイルの SHA)
 pub async fn commit_file(app: &App, commit: &Commit<'_>) -> Result<(String, String), String> {
-    let clean_path = path::normalize(commit.path).ok_or_else(|| "Invalid path".to_string())?;
+    let clean_path =
+        path::normalize_for_save(commit.path).ok_or_else(|| "Invalid path".to_string())?;
 
     let current_sha = match commit.sha.filter(|s| !s.is_empty()) {
         Some(sha) => Some(sha.to_string()),
@@ -94,12 +110,13 @@ pub async fn commit_file(app: &App, commit: &Commit<'_>) -> Result<(String, Stri
     let user = commit.user;
     let display_name = user.display_name();
     let email = format!("{}+discord@users.noreply.torosaba.net", user.id());
-    let message = match commit.message.filter(|m| !m.is_empty()) {
-        Some(message) => format!("{message}\n\nCo-authored-by: {display_name} <{email}>"),
-        None => format!(
+    let summary = commit.message.map(summary_line).unwrap_or_default();
+    let message = match summary.as_str() {
+        "" => format!(
             "Wiki update: {clean_path}\n\nEdited via Browser/API by Discord user {display_name} ({})",
             user.id()
         ),
+        summary => format!("{summary}\n\nCo-authored-by: {display_name} <{email}>"),
     };
     let author = json!({ "name": format!("{display_name} (via Discord)"), "email": email });
 
@@ -201,4 +218,22 @@ fn decode_content(content: &Value) -> Result<String, String> {
         .collect();
     let bytes = STANDARD.decode(encoded).map_err(|e| e.to_string())?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_messages_are_one_short_line() {
+        assert_eq!(summary_line("直した"), "直した");
+        assert_eq!(summary_line("1 行目\n\n2 行目\nTrailer: x"), "1 行目");
+        assert_eq!(summary_line("1 行目\r\n2 行目"), "1 行目");
+        assert_eq!(summary_line("a\tb\u{7f}c"), "abc");
+        assert_eq!(summary_line("\n本文"), "");
+        assert_eq!(
+            summary_line(&"あ".repeat(MAX_SUMMARY_CHARS + 1)),
+            "あ".repeat(MAX_SUMMARY_CHARS)
+        );
+    }
 }

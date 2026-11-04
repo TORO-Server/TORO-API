@@ -19,10 +19,11 @@ pub mod site;
 pub mod util;
 pub mod wiki;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use config::Config;
-use tokio::sync::Semaphore;
+use serde_json::Value;
+use tokio::sync::{Mutex, Semaphore};
 
 /// 同時に処理するリクエストの上限 (ボディは最大 2 MiB なので、メモリは約 512 MiB まで)
 const MAX_CONCURRENT_REQUESTS: usize = 256;
@@ -33,6 +34,8 @@ pub struct App {
     pub http: reqwest::Client,
     pub requests: Semaphore,
     pub wiki_index: wiki::search::Index,
+    /// 最後に尋ねた Minecraft サーバーの稼働状態 (要求のたびにつながないため)
+    pub server_status: Mutex<Option<(Instant, Value)>>,
 }
 
 impl App {
@@ -48,6 +51,7 @@ impl App {
             http,
             requests: Semaphore::new(MAX_CONCURRENT_REQUESTS),
             wiki_index: wiki::search::Index::new(wiki_index_ttl),
+            server_status: Mutex::new(None),
         })
     }
 }

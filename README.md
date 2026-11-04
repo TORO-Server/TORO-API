@@ -12,9 +12,9 @@ TORO Server の REST API のサーバーです。Rust 製で、TORO のサーバ
 | `GET /me` | Bearer (任意) | トークンの持ち主 |
 | `GET /docs/raw?path=` | なし | Wiki の原稿の取得 (`format=raw` で Markdown だけ) |
 | `GET /docs/list?category=` | なし | `docs/` の下の原稿のパスの一覧 |
-| `GET /docs/search?q=` | なし | 原稿の全文検索 (語をすべて含むものを、よく一致する順に) |
+| `GET /docs/search?q=` | なし | 原稿の全文検索 (語をすべて含むものを、よく一致する順に)。512 バイト、異なる語 16 個まで |
 | `POST /docs/save` | Bearer (編集権限) | 原稿の保存 (GitHub へのコミット) |
-| `GET /server/status` | なし | Minecraft サーバーの稼働状態 |
+| `GET /server/status` | なし | Minecraft サーバーの稼働状態 (10 秒だけ覚える) |
 | `GET /openapi.json` | なし | OpenAPI 仕様 (ChatGPT Actions / Gemini 向け) |
 | `GET /healthz` | なし | 稼働確認 |
 
@@ -54,7 +54,7 @@ TORO Server の REST API のサーバーです。Rust 製で、TORO のサーバ
 
 | 機能 | ソース | 試験 |
 | --- | --- | --- |
-| Wiki の原稿の読み書きと一覧 | `src/wiki/api.rs` `src/wiki/github.rs` `src/wiki/path.rs` | `tests/wiki.rs` |
+| Wiki の原稿の読み書きと一覧 | `src/wiki/api.rs` `src/wiki/github.rs` `src/wiki/path.rs` `src/wiki/content.rs` | `tests/wiki.rs` |
 | Wiki の全文検索 | `src/wiki/search.rs` | `tests/search.rs` |
 | Minecraft の稼働状態 | `src/minecraft.rs` | 同じファイル内、`tests/service.rs` |
 | トークンの確認 | `src/identity.rs` | `tests/service.rs` |
@@ -90,10 +90,15 @@ GitHub Actions が、試験に通ったものだけを GHCR (`ghcr.io/toro-serve
 - **トークンの検証は auth に任せる**。このサービスが侵害されても、トークンは偽造できない (署名の鍵を持たない)
 - **auth の内部の口は公開しない**。`AUTH_INTERNAL_URL` の先をトンネルやポートの公開に載せない
 - **Wiki のパスは `docs/` の下の `.md` だけ**。どの入口でも `..` や `\` を断る (`src/wiki/path.rs`)
-- **Wiki の変更には `can_edit` と、scope の `write` か `mcp` が要る**
+- **保存できるのは Wiki のページだけ**。`.md` 以外の拡張子、ビルドが別に扱うもの (`docs/README.md`、`attachments`、`.` で始まるもの)、手元の Windows で取り出せない名前、見えない文字を含む名前は断る
+- **保存する原稿の front matter は YAML だけ** (`src/wiki/content.rs`)。開きの `---` の後ろに他の言語を書いたものは断る
+- **コミットメッセージは 1 行目の 200 文字まで**。だれの編集かを示す行を足させない
+- **Wiki の変更には `can_edit` と、scope の `write` か `mcp` が要る**。`can_edit` は auth がいまのロールで決めた値
+- **検索は 512 バイト、異なる語 16 個まで**。点数はロックの外で、同時に 2 つまで付ける
+- **だれでも読める窓口には、GitHub の答えをそのまま見せない**。ログにだけ残す
+- **遅い送信で同時処理の枠を埋めさせない**。ボディは 30 秒で読み切れなければ 408 で切る
 
 ### 知ったうえで残しているもの
 
-- `can_edit` はトークンの発行時のまま。ギルドを抜けても、トークンの期限までは編集できる
 - 匿名の Wiki の読み取りは、サーバーの GitHub トークンの枠を使う。Cloudflare のレート制限で守る
 - 検索の索引はメモリの中だけ。再起動すると、最初の検索で原稿を読み直す

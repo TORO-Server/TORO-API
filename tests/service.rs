@@ -117,6 +117,29 @@ async fn oversized_bodies_are_refused() {
 }
 
 #[tokio::test]
+async fn slow_bodies_are_cut_off_and_the_slot_comes_back() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let server = start_with(|cfg| cfg.body_read_timeout_secs = 1).await;
+    let address = server.base.strip_prefix("http://").unwrap();
+    let mut stream = tokio::net::TcpStream::connect(address).await.unwrap();
+    // 宣言した長さのボディを送らないまま待つ
+    stream
+        .write_all(b"POST /docs/save HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\n\r\n")
+        .await
+        .unwrap();
+    let mut head = [0u8; 12];
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        stream.read_exact(&mut head),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(&head, b"HTTP/1.1 408");
+    assert_eq!(server.get("/healthz").await.status(), 200);
+}
+
+#[tokio::test]
 async fn openapi_describes_every_endpoint_with_the_configured_url() {
     let server = start().await;
     let res = server.get("/openapi.json").await;
@@ -403,4 +426,8 @@ async fn server_status_reports_a_running_server() {
     assert_eq!(body["players"]["max"], 100);
     assert_eq!(body["players"]["names"], json!(["a"]));
     assert_eq!(body["motd"], json!(["TORO"]));
+
+    // 続けて聞かれても、つなぎ直さない (偽のサーバーは 1 回しか受けない)
+    let again: Value = server.get("/server/status").await.json().await.unwrap();
+    assert_eq!(again, body);
 }

@@ -102,6 +102,130 @@ async fn paths_outside_docs_never_reach_github() {
 }
 
 #[tokio::test]
+async fn only_wiki_pages_can_be_saved() {
+    let server = start().await;
+    for bad in [
+        ".hidden/x",
+        "docs/.hidden/x.md",
+        "attachments/x",
+        "docs/attachments/x.md",
+        "README",
+        "docs/README.md",
+        "docs/../outside",
+        "a.html",
+        "a:b",
+        "docs/CON.md",
+        "a\u{202E}b",
+    ] {
+        let res = server
+            .save(Some(MEMBER_TOKEN), &json!({ "path": bad, "content": "x" }))
+            .await;
+        assert_eq!(res.status(), 400, "{bad}");
+        assert_eq!(
+            res.json::<Value>().await.unwrap()["error"],
+            "Invalid path",
+            "{bad}"
+        );
+    }
+    assert!(server.github.requests.lock().unwrap().is_empty());
+    assert!(server.github.commits.lock().unwrap().is_empty());
+
+    // 読むほうは今までどおり
+    server.put_file("docs/README.md", "abc", "説明");
+    assert_eq!(server.get("/docs/raw?path=README").await.status(), 200);
+
+    let res = server
+        .save(
+            Some(MEMBER_TOKEN),
+            &json!({ "path": JP_PATH, "content": "本文" }),
+        )
+        .await;
+    assert_eq!(res.status(), 200);
+    assert!(
+        server
+            .github
+            .files
+            .lock()
+            .unwrap()
+            .contains_key(&encoded_jp_path())
+    );
+}
+
+#[tokio::test]
+async fn front_matter_must_be_yaml() {
+    let server = start().await;
+    for bad in [
+        "---toml\ntitle = \"a\"\n---\n本文",
+        "\u{FEFF}---toml\ntitle = \"a\"\n---\n本文",
+        "---toml",
+    ] {
+        let res = server
+            .save(Some(MEMBER_TOKEN), &json!({ "path": "a", "content": bad }))
+            .await;
+        assert_eq!(res.status(), 400, "{bad:?}");
+        assert_eq!(
+            res.json::<Value>().await.unwrap()["error"],
+            "Front matter must be YAML"
+        );
+    }
+    assert!(server.github.requests.lock().unwrap().is_empty());
+
+    for good in [
+        "---\ntitle: \"a\"\n---\n本文",
+        "---yaml\ntitle: a\n---\n本文",
+        "本文\n---toml\n",
+    ] {
+        let res = server
+            .save(Some(MEMBER_TOKEN), &json!({ "path": "a", "content": good }))
+            .await;
+        assert_eq!(res.status(), 200, "{good:?}");
+    }
+}
+
+#[tokio::test]
+async fn save_only_answers_to_post() {
+    let server = start().await;
+    let res = server
+        .client
+        .get(server.url("/docs/save"))
+        .bearer_auth(MEMBER_TOKEN)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 405);
+    // 権限の確認の前に断る
+    assert!(server.auth.requests.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn only_the_first_line_of_a_commit_message_is_used() {
+    let server = start().await;
+    let res = server
+        .save(
+            Some(MEMBER_TOKEN),
+            &json!({ "path": "a", "content": "x", "message": "直した\n\n2 行目は使わない" }),
+        )
+        .await;
+    assert_eq!(res.status(), 200);
+    let commits = server.github.commits.lock().unwrap();
+    let message = commits[0]["message"].as_str().unwrap();
+    assert!(message.starts_with("直した\n\nCo-authored-by: member_user <1001+discord@"));
+    assert!(!message.contains("2 行目"));
+}
+
+#[tokio::test]
+async fn github_errors_are_not_shown_to_anonymous_readers() {
+    // GitHub が答えないとき。理由はログにだけ残す
+    let server = start_with(|cfg| cfg.github_api = "http://127.0.0.1:9".into()).await;
+    let res = server.get("/docs/raw?path=a").await;
+    assert_eq!(res.status(), 500);
+    assert_eq!(
+        res.json::<Value>().await.unwrap(),
+        json!({ "error": "Could not read the document" })
+    );
+}
+
+#[tokio::test]
 async fn save_requires_login_and_permission() {
     let server = start().await;
     let body = json!({ "path": "a", "content": "x" });
