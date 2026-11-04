@@ -29,7 +29,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "ドキュメントの相対パス（例: \"07_System/Discord認証編集とAIコネクタ.md\"）"
+            "description": "ドキュメントの相対パス（例: \"07_System/AIクライアントの接続方法.md\"）"
           },
           {
             "name": "format",
