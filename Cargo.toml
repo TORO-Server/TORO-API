@@ -1,6 +1,6 @@
 [package]
 name = "toro-api"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 description = "TORO Server の REST API (api.torosaba.net)"
 publish = false
