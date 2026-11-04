@@ -80,6 +80,20 @@ async fn list_returns_the_pages_under_docs() {
 }
 
 #[tokio::test]
+async fn list_removes_only_the_first_docs_folder() {
+    let server = start().await;
+    server.github.docs.lock().unwrap().insert(
+        "docs/docs/c.md".to_string(),
+        ("sha-c".to_string(), "本文".to_string()),
+    );
+    let body: Value = server.get("/docs/list").await.json().await.unwrap();
+    assert_eq!(
+        body["pages"],
+        json!(["01_About/a.md", "02_Guide/b.md", "docs/c.md"])
+    );
+}
+
+#[tokio::test]
 async fn paths_outside_docs_never_reach_github() {
     let server = start().await;
     for bad in ["../secret", "a/../../secret", "a\\b", "a//b"] {

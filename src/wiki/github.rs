@@ -193,7 +193,13 @@ pub async fn list_pages(app: &App, category: Option<&str>) -> Vec<String> {
         .await
         .unwrap_or_default()
         .into_iter()
-        .map(|blob| blob.path.trim_start_matches("docs/").to_string())
+        .map(|blob| {
+            // 先頭の docs/ を 1 つだけ外す (docs/docs/a.md を別のパスとして見せない)
+            blob.path
+                .strip_prefix("docs/")
+                .unwrap_or(&blob.path)
+                .to_string()
+        })
         .filter(|path| category.is_none_or(|c| path.starts_with(c)))
         .collect()
 }
