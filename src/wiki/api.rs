@@ -1,11 +1,12 @@
 //! Wiki の原稿の API (/docs/*)。認証は Bearer だけ (Cookie を見ないので CSRF は成り立たない)
 
+use axum::http::Method;
 use axum::http::header::{self, HeaderMap, HeaderValue};
 use axum::response::Response;
 use serde_json::{Value, json};
 
 use super::github::{self, Commit};
-use super::path;
+use super::{content, path, search as index};
 use crate::App;
 use crate::api::unavailable;
 use crate::http::{self, Ctx};
@@ -22,7 +23,11 @@ pub async fn raw(app: &App, ctx: &Ctx) -> Response {
 
     match github::get_file(app, &clean_path).await {
         Ok(None) => http::error(ctx, &format!("File not found: {requested}"), 404),
-        Err(message) => http::error(ctx, &message, 500),
+        // だれでも読める窓口なので、GitHub の答えはログにだけ残す
+        Err(message) => {
+            eprintln!("wiki raw: {message}");
+            http::error(ctx, "Could not read the document", 500)
+        }
         Ok(Some(file)) if ctx.q("format") == Some("raw") => {
             let mut headers = HeaderMap::new();
             if let Ok(etag) = HeaderValue::from_str(&format!("\"{}\"", file.sha)) {
@@ -47,6 +52,9 @@ pub async fn list(app: &App, ctx: &Ctx) -> Response {
 /// GET /docs/search: 語をすべて含む原稿のパスを、よく一致する順に返す
 pub async fn search(app: &App, ctx: &Ctx) -> Response {
     let query = ctx.q("q").unwrap_or("");
+    if !index::query_fits(query) {
+        return http::error(ctx, "Search query is too long", 400);
+    }
     match app.wiki_index.search(app, query).await {
         Some(hits) => http::json(ctx, &json!({ "query": query, "hits": hits }), 200),
         None => http::error(ctx, "Wiki search is unavailable", 503),
@@ -55,6 +63,9 @@ pub async fn search(app: &App, ctx: &Ctx) -> Response {
 
 /// POST /docs/save
 pub async fn save(app: &App, ctx: &Ctx) -> Response {
+    if ctx.method != Method::POST {
+        return http::error(ctx, "Method Not Allowed", 405);
+    }
     let user = match identity::identify(app, ctx).await {
         Identity::User(user) => user,
         Identity::Anonymous | Identity::Invalid => {
@@ -79,8 +90,11 @@ pub async fn save(app: &App, ctx: &Ctx) -> Response {
     let Some(content) = body["content"].as_str() else {
         return http::error(ctx, "Field \"content\" is required", 400);
     };
-    if requested.starts_with('/') || path::normalize(requested).is_none() {
+    if path::normalize_for_save(requested).is_none() {
         return http::error(ctx, "Invalid path", 400);
+    }
+    if !content::front_matter_is_yaml(content) {
+        return http::error(ctx, "Front matter must be YAML", 400);
     }
 
     let commit = Commit {
