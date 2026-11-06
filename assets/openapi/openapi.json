@@ -133,9 +133,10 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 512
             },
-            "description": "検索する語（空白区切り）"
+            "description": "検索する語（空白区切り）。512 バイトまで、異なる語は 16 個まで。"
           }
         ],
         "responses": {
@@ -159,6 +160,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "検索の文字列が長すぎます"
           },
           "503": {
             "description": "検索の準備ができていません"
@@ -239,15 +243,15 @@
                 "properties": {
                   "path": {
                     "type": "string",
-                    "description": "保存先のドキュメントパス"
+                    "description": "保存先のドキュメントパス。docs/ の下の .md だけで (拡張子を省くと .md になります)、Wiki のページにならないもの (docs/README.md、attachments、. で始まるもの) は保存できません。"
                   },
                   "content": {
                     "type": "string",
-                    "description": "保存する Markdown 本文全体"
+                    "description": "保存する Markdown 本文全体。front matter は YAML だけです。"
                   },
                   "message": {
                     "type": "string",
-                    "description": "Git コミットメッセージ"
+                    "description": "Git コミットメッセージ。1 行目の 200 文字までを使います。"
                   },
                   "sha": {
                     "type": "string",
@@ -285,6 +289,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "パスまたは本文が正しくありません"
           },
           "401": {
             "description": "Discord 認証トークンが必要です"

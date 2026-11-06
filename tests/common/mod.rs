@@ -250,6 +250,7 @@ pub async fn start_with(customize: impl FnOnce(&mut Config)) -> TestServer {
         github_branch: "main".into(),
         github_api: start_fake_github(github).await,
         wiki_index_ttl_secs: 300,
+        body_read_timeout_secs: 30,
         // 誰も待っていないポート
         mc_status_addr: "127.0.0.1:9".into(),
         mc_status_host: "torosaba.net".into(),
