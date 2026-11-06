@@ -45,8 +45,8 @@ impl Session {
 
     /// Wiki を変更してよいか。OAuth のトークンは、許可された scope (write か mcp) の中だけ
     pub fn can_write(&self) -> bool {
-        let scope_allows = match self.claims.get("scope").and_then(Value::as_str) {
-            Some(scope) => scope_allows_write(scope),
+        let scope_allows = match self.claims.get("scope") {
+            Some(scope) => scope.as_str().is_some_and(scope_allows_write),
             None => true,
         };
         self.can_edit() && scope_allows
@@ -139,5 +139,8 @@ mod tests {
         assert!(session(json!({ "can_edit": true, "scope": "mcp" })).can_write());
         assert!(!session(json!({ "can_edit": true, "scope": "read" })).can_write());
         assert!(!session(json!({ "can_edit": false, "scope": "write" })).can_write());
+        // 文字列でない scope は、無いものと同じに扱わない
+        assert!(!session(json!({ "can_edit": true, "scope": null })).can_write());
+        assert!(!session(json!({ "can_edit": true, "scope": ["write"] })).can_write());
     }
 }
