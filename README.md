@@ -34,7 +34,6 @@ TORO Server の REST API のサーバーです。Rust 製で、TORO のサーバ
                                                                          └─ toro-velocity:25565 (稼働状態)
 ```
 
-- トンネルの公開ルート: `api.torosaba.net` → `http://toro-api:8080`
 - `AUTH_INTERNAL_URL` (既定は `http://toro-auth:8081`) に届くことが必要です。auth の内部の口で、トンネルには載せません
 - データベースもディスクも使いません。持つのは、メモリの中の Wiki の全文検索の索引だけです
 
