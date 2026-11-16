@@ -181,6 +181,7 @@ async fn openapi_describes_every_endpoint_with_the_configured_url() {
     assert_eq!(res.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
     let spec: Value = res.json().await.unwrap();
     assert_eq!(spec["servers"][0]["url"], "https://api.torosaba.net");
+    assert_eq!(spec["info"]["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(
         spec["paths"]["/docs/save"]["post"]["operationId"],
         "saveWikiDoc"

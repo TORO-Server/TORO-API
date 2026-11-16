@@ -5,10 +5,11 @@ use axum::response::Response;
 use crate::App;
 use crate::http::{self, Ctx};
 
-/// 仕様の中の `{{SERVER_URL}}` に、設定の URL を入れる
+/// 仕様の中の `{{SERVER_URL}}` に設定の URL を、`{{VERSION}}` に Cargo.toml の version を入れる
 pub fn handle(app: &App, _ctx: &Ctx) -> Response {
-    let spec =
-        include_str!("../assets/openapi/openapi.json").replace("{{SERVER_URL}}", &app.cfg.api_url);
+    let spec = include_str!("../assets/openapi/openapi.json")
+        .replace("{{SERVER_URL}}", &app.cfg.api_url)
+        .replace("{{VERSION}}", env!("CARGO_PKG_VERSION"));
     http::respond(
         200,
         http::public_headers(),
