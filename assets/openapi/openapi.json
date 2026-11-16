@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TORO Server API",
-    "version": "1.0.0",
+    "version": "{{VERSION}}",
     "description": "TORO Server の REST API。Wiki の原稿の読み取り・検索・コミットと、Minecraft サーバーの稼働状態の確認ができます。書き込みには auth.torosaba.net で発行した Bearer トークンが必要です。ChatGPT Actions や Gemini Extensions から利用できます。",
     "contact": {
       "name": "TORO Server Administration",
