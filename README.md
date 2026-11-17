@@ -1,14 +1,14 @@
 # toro-api
 
-TORO Server の REST API のサーバーです。Rust で書かれています。
+TORO Server の REST API (他のプログラムとデータをやり取りするための決まり) のサーバーです。Rust で書かれています。
 
-役割は「データを読み書きする」ことだけです。ログインとトークンの発行は [TORO-Auth](https://github.com/TORO-Server/TORO-Auth)、AI クライアントの接続先は [TORO-MCP](https://github.com/TORO-Server/TORO-MCP) が受け持ちます。
+役割は「データを読み書きする」ことだけです。ログインとトークン (本人確認済みの印になる文字列) の発行は [TORO-Auth](https://github.com/TORO-Server/TORO-Auth)、AI クライアント (AI を使うアプリ) の接続先は [TORO-MCP](https://github.com/TORO-Server/TORO-MCP) が受け持ちます。
 
 ## 使えるもの
 
 - Wiki の原稿の読み取り・一覧・全文検索・保存
 - Minecraft サーバーの稼働状態
-- 2D 地図の API (`/map/v1/*`。Dynmap の DB を読んで、地図の画面 map.torosaba.net に返す。WebSocket の `/map/v1/ws` を含む)
+- 2D 地図の API (`/map/v1/*`。Dynmap のデータベースを読んで、地図の画面 map.torosaba.net に返す。WebSocket (つなぎっぱなしで通信する方式) の `/map/v1/ws` を含む)
 - 各サービスの URL の一覧
 
 パス・認証の要否・パラメーターの正本は [assets/openapi/openapi.json](assets/openapi/openapi.json) です (動いているサーバーの `GET /openapi.json` でも同じものが返ります)。
