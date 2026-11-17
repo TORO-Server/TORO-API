@@ -356,7 +356,11 @@ fn classify_matches() {
             None => None,
         };
         assert_eq!(manifest, want["manifest"].as_str(), "{name} manifest");
-        assert_eq!(got.stream, want["stream"].as_bool().unwrap_or(false), "{name} stream");
+        assert_eq!(
+            got.stream,
+            want["stream"].as_bool().unwrap_or(false),
+            "{name} stream"
+        );
     }
 }
 
