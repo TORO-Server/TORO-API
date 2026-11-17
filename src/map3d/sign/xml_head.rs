@@ -72,14 +72,13 @@ pub fn skip_xml_head(text: &str, decl: bool, doctype: bool) -> Option<usize> {
         at = skip_space(text, end + 1);
     }
     loop {
-        let end;
-        if text[at..].starts_with("<!--") {
-            end = at + 4 + text[at + 4..].find("-->")? + 2;
+        let end = if text[at..].starts_with("<!--") {
+            at + 4 + text[at + 4..].find("-->")? + 2
         } else if doctype && word_at(text, at, "<!doctype") {
-            end = at + text[at..].find('>')?;
+            at + text[at..].find('>')?
         } else {
             return Some(at);
-        }
+        };
         at = skip_space(text, end + 1);
     }
 }

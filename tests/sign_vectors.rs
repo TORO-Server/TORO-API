@@ -44,7 +44,7 @@ pub fn expand(v: &Value) -> String {
 }
 
 pub fn from_hex(h: &str) -> Vec<u8> {
-    assert!(h.len() % 2 == 0);
+    assert!(h.len().is_multiple_of(2));
     (0..h.len() / 2)
         .map(|i| u8::from_str_radix(&h[i * 2..i * 2 + 2], 16).unwrap())
         .collect()

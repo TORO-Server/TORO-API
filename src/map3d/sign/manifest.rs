@@ -959,6 +959,7 @@ mod gltf_json {
     }
 
     /// (buffers の uri、images の uri)。オブジェクトの JSON として読めなければ None
+    #[allow(clippy::type_complexity)]
     pub fn uris(json: &str) -> Option<(Vec<Option<String>>, Vec<Option<String>>)> {
         let Root(buffers, images) = serde_json::from_str(json).ok()?;
         Some((buffers.0, images.0))
