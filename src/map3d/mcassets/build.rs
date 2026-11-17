@@ -195,7 +195,7 @@ impl Section {
 }
 
 /// JavaScript の配列の `sort()` (UTF-16 の順) と同じ並べ方
-fn utf16_cmp(a: &String, b: &String) -> Ordering {
+fn utf16_cmp(a: &str, b: &str) -> Ordering {
     a.encode_utf16().cmp(b.encode_utf16())
 }
 
@@ -208,7 +208,7 @@ pub fn build(jar: &Path, unifont: Option<Arc<Unifont>>) -> io::Result<Built> {
         .filter(|p| p.starts_with("assets/") || p.starts_with("data/"))
         .map(str::to_string)
         .collect();
-    paths.sort_by(utf16_cmp);
+    paths.sort_by(|a, b| utf16_cmp(a, b));
 
     let version = match parse_json(zip.get("version.json")?) {
         Some(Value::Object(o)) => match o.get("name") {
