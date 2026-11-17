@@ -8,6 +8,8 @@ publish = false
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
 base64 = "0.23"
+# 看板: glTF の JSON の読み取り (数を読み飛ばして、範囲外の数でも失敗しないようにする)
+serde = "1"
 # mcassets: assets.json の brotli (品質 11)。純 Rust (C のライブラリを引かない)
 brotli = { version = "9", default-features = false, features = ["std"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
