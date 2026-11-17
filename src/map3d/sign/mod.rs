@@ -1,6 +1,8 @@
 //! `/map3d/v1/marumasign/...`: 看板データ、転送先の確認 (resolve)、中継 (proxy)。(実装は別のコミットで置き換える)
 
+pub mod allow;
 pub mod core;
+pub mod kinds;
 pub mod limits;
 pub mod manifest;
 pub mod net;
