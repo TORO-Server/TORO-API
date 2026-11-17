@@ -1261,3 +1261,6 @@ mod tests {
         assert!(parse_content_range("bytes x").is_none());
     }
 }
+
+#[cfg(test)]
+mod service_tests;
