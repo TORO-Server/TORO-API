@@ -59,6 +59,30 @@ pub fn router_with(map: Arc<MapService>, map3d: Option<Arc<Map3d>>) -> Router {
         .with_state(Internal { map, map3d })
 }
 
+/// `/live/clients` と `/healthz` だけを受ける追加の内部専用の待受のルーター (`MAP_CLIENTS_ADDR`)。
+/// `/live/clients` の検証は、`router_with` の待受と同じ `clients` を使う。`/healthz` には人数だけを出す (IP は出さない)
+pub fn clients_router(map3d: Arc<Map3d>) -> Router {
+    Router::new().fallback(dispatch_clients).with_state(map3d)
+}
+
+async fn dispatch_clients(State(map3d): State<Arc<Map3d>>, request: Request) -> Response {
+    match request.uri().path() {
+        "/healthz" => {
+            let body = json!({ "ok": true, "players": map3d.clients.online_count() });
+            let mut res = Response::new(body.to_string().into());
+            let headers = res.headers_mut();
+            headers.insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            );
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            res
+        }
+        "/live/clients" => clients(map3d, request).await,
+        _ => text_response(StatusCode::NOT_FOUND, "Not Found"),
+    }
+}
+
 fn text_response(status: StatusCode, text: &'static str) -> Response {
     let mut res = Response::new(text.into());
     *res.status_mut() = status;
