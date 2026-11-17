@@ -105,8 +105,25 @@ impl Config {
     }
 
     pub fn from_env() -> Result<Self, String> {
-        let github_token = optional("GITHUB_TOKEN")
-            .ok_or_else(|| "missing environment variables: GITHUB_TOKEN".to_string())?;
+        // 必須の環境変数。足りないものは、まとめてエラーにする
+        let mut missing = Vec::new();
+        let mut required = |name: &'static str| {
+            optional(name).unwrap_or_else(|| {
+                missing.push(name);
+                String::new()
+            })
+        };
+        let github_token = required("GITHUB_TOKEN");
+        let auth_internal_url = required("AUTH_INTERNAL_URL")
+            .trim_end_matches('/')
+            .to_string();
+        let mc_status_addr = required("MC_STATUS_ADDR");
+        if !missing.is_empty() {
+            return Err(format!(
+                "missing environment variables: {}",
+                missing.join(", ")
+            ));
+        }
 
         Ok(Self {
             port: or_default("PORT", "8080")
@@ -116,7 +133,7 @@ impl Config {
             api_url: trimmed("PUBLIC_API_URL", "https://api.torosaba.net"),
             mcp_url: trimmed("PUBLIC_MCP_URL", "https://mcp.torosaba.net"),
             wiki_url: trimmed("PUBLIC_WIKI_URL", "https://wiki.torosaba.net"),
-            auth_internal_url: trimmed("AUTH_INTERNAL_URL", "http://toro-auth:8081"),
+            auth_internal_url,
             cors_origins: or_default("CORS_ORIGINS", "https://wiki.torosaba.net")
                 .split(',')
                 .map(|origin| origin.trim().to_string())
@@ -129,7 +146,7 @@ impl Config {
             github_api: trimmed("GITHUB_API", "https://api.github.com"),
             wiki_index_ttl_secs: 300,
             body_read_timeout_secs: 30,
-            mc_status_addr: or_default("MC_STATUS_ADDR", "toro-velocity:25565"),
+            mc_status_addr,
             mc_status_host: or_default("MC_STATUS_HOST", "torosaba.net"),
             map: MapConfig::from_env()?,
         })
