@@ -1,4 +1,4 @@
-//! BlueMap 内蔵の Web サーバー (toro-main の 8100 番) からの取得。プレイヤーの位置とマーカー。
+//! BlueMap 内蔵の Web サーバー からの取得。プレイヤーの位置とマーカー。
 //! 内部ネットワークだけで届く。ここへは、DB に無いライブ情報だけを聞きに行く。
 
 use std::time::Duration;
@@ -68,17 +68,29 @@ mod tests {
 
     #[test]
     fn urls_encode_the_map_id_as_one_segment() {
-        let url = live_url("http://toro-main:8100", "overworld", "players.json").unwrap();
+        let url = live_url(
+            "http://bluemap.internal.example:8100",
+            "overworld",
+            "players.json",
+        )
+        .unwrap();
         assert_eq!(
             url.as_str(),
-            "http://toro-main:8100/maps/overworld/live/players.json"
+            "http://bluemap.internal.example:8100/maps/overworld/live/players.json"
         );
-        let url = live_url("http://toro-main:8100", "a/b?c#d", "sse").unwrap();
+        let url = live_url("http://bluemap.internal.example:8100", "a/b?c#d", "sse").unwrap();
         assert_eq!(
             url.as_str(),
-            "http://toro-main:8100/maps/a%2Fb%3Fc%23d/live/sse"
+            "http://bluemap.internal.example:8100/maps/a%2Fb%3Fc%23d/live/sse"
         );
-        let url = web_url("http://toro-main:8100", &["marumasign", "x.json"]).unwrap();
-        assert_eq!(url.as_str(), "http://toro-main:8100/marumasign/x.json");
+        let url = web_url(
+            "http://bluemap.internal.example:8100",
+            &["marumasign", "x.json"],
+        )
+        .unwrap();
+        assert_eq!(
+            url.as_str(),
+            "http://bluemap.internal.example:8100/marumasign/x.json"
+        );
     }
 }

@@ -1,4 +1,4 @@
-//! `/map3d/v1/mcassets/...`: 構造物の看板を描くための Minecraft のリソース。移管前の toro-webmap の `/mcassets/*` の置き換え。
+//! `/map3d/v1/mcassets/...`: 構造物の看板を描くための Minecraft のリソース。移管前の地図サーバーの `/mcassets/*` の置き換え。
 //!
 //! - `index.json`: いまのバージョン (hash)。jar が無い、または作っている途中なら 503
 //! - `<hash>/assets.json`: blockstates、models、アイテム、バイオームの色など (br、gzip、無圧縮)
@@ -616,7 +616,7 @@ fn single<'a>(ctx: &'a Ctx, name: &str) -> Option<&'a str> {
     found.next().is_none().then_some(first.1.as_str())
 }
 
-/// 上限を数える相手の IP。toro-edge が付ける `X-Toro-Client-Ip`、Cloudflare の `cf-connecting-ip`、`X-Forwarded-For` の先頭の順。
+/// 上限を数える相手の IP。前段のプロキシが付ける `X-Toro-Client-Ip`、Cloudflare の `cf-connecting-ip`、`X-Forwarded-For` の先頭の順。
 /// どれも無ければ "unknown" (リクエストの `Ctx` には、つながってきた相手のアドレスが入っていない)
 fn client_ip(ctx: &Ctx) -> String {
     for name in ["x-toro-client-ip", "cf-connecting-ip"] {

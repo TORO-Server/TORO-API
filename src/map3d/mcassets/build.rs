@@ -1,5 +1,5 @@
 //! 構造物の看板を描くための Minecraft のリソースのまとめを、client の jar から作る。
-//! TORO-WebMap の `server/utils/mcassets-build.ts` の移植 (出力は同じバイト列になるようにしてある。`jsjson` を見ること)。
+//! 移管前の地図サーバーの `server/utils/mcassets-build.ts` の移植 (出力は同じバイト列になるようにしてある。`jsjson` を見ること)。
 //!
 //! ブロックの blockstates と models、アイテムの定義、防具の層、テクスチャ (と .mcmeta のアニメーション)、バイオームの色、
 //! 絵画の大きさ、フォントを集めて、ブラウザーが 1 度だけ読めばよい形 (JSON 1 つとテクスチャを並べたもの 1 つ) にする。

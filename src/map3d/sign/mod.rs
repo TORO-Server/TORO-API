@@ -14,7 +14,7 @@
 //! にあるときに許可し、`Cross-Origin-Resource-Policy` は `same-site` にする。
 //!
 //! 同時に読む数は、このサービス全体の同時処理の枠とは別に数える (長い配信で枠を埋めない)。
-//! 正本 (移管前) は TORO-WebMap の `server/lib/marumasign/` と `server/routes/_marumasign/`。
+//! 正本 (移管前) は、移管前の地図サーバーの `server/lib/marumasign/` と `server/routes/_marumasign/`。
 //! 移管前と違う点: 元のサイトが `Accept-Encoding: identity` を無視して圧縮して返したときは、展開せず 502 にする。
 //!
 //! # 環境変数

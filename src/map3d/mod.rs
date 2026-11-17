@@ -1,12 +1,12 @@
-//! 3D 地図 (BlueMap) の API。移管前の TORO-WebMap のサーバー側 (toro-webmap) の 3D の部分の置き換え。
+//! 3D 地図 (BlueMap) の API。移管前の地図サーバーの 3D の部分の置き換え。
 //!
-//! 3D の「唯一の情報元」は BlueMap のバックエンド (TiDB の `bluemap` データベースと、toro-main の内蔵サーバー) で、
+//! 3D の「唯一の情報元」は BlueMap のバックエンド (TiDB の `bluemap` データベースと、BlueMap 内蔵のサーバー) で、
 //! 唯一の読み手がこのサービス。
 //!
 //! - `store`: `bluemap` データベースの読み取り (SELECT だけ)
 //! - `maps`: `/map3d/v1/maps/{地図}/...` (設定、テクスチャ、タイル、プレイヤーの顔、ライブ情報)
-//! - `live`: toro-main の内蔵サーバーからの取得 (プレイヤー、マーカー)
-//! - `hub`: toro-main の SSE を地図ごとに 1 本だけ購読し、WebSocket と SSE の閲覧者へ配る
+//! - `live`: BlueMap 内蔵のサーバーからの取得 (プレイヤー、マーカー)
+//! - `hub`: BlueMap 内蔵のサーバーの SSE を地図ごとに 1 本だけ購読し、WebSocket と SSE の閲覧者へ配る
 //! - `ws`: `/map3d/v1/ws` (WebSocket)
 //! - `sign`: `/map3d/v1/marumasign/...` (看板データ、転送先の確認、中継)
 //! - `mcassets`: `/map3d/v1/mcassets/...` (構造物の看板を描くための Minecraft のリソース)
@@ -61,7 +61,7 @@ pub struct Map3dConfig {
     pub assets_origins: Vec<String>,
     /// ログアウトしてからも、その IP から `/_assets/` を読めるようにしておく時間 (分。`MAP_ASSETS_GRACE_MINUTES`)
     pub grace_minutes: u64,
-    /// TORO-Proxy が `/live/clients` に送るときの合言葉 (`MAP_CLIENTS_TOKEN`)。空なら受け付けない
+    /// 入口のプロキシが `/live/clients` に送るときの合言葉 (`MAP_CLIENTS_TOKEN`)。空なら受け付けない
     pub clients_token: String,
     pub mcassets: mcassets::McAssetsConfig,
     pub sign: sign::SignConfig,
@@ -83,11 +83,17 @@ impl Map3dConfig {
                 Some((map.trim().to_string(), world.trim().to_string()))
             })
             .collect();
+        // 3D 地図を動かすときは、BlueMap 内蔵のサーバーの URL が要る (既定値はない)
+        let bluemap_database = optional("MAP_BLUEMAP_DATABASE");
+        let bluemap_live = optional("MAP_BLUEMAP_LIVE")
+            .map(|url| url.trim_end_matches('/').to_string())
+            .unwrap_or_default();
+        if bluemap_database.is_some() && bluemap_live.is_empty() {
+            return Err("missing environment variables: MAP_BLUEMAP_LIVE".to_string());
+        }
         Ok(Self {
-            bluemap_database: optional("MAP_BLUEMAP_DATABASE"),
-            bluemap_live: or_default("MAP_BLUEMAP_LIVE", "http://toro-main:8100")
-                .trim_end_matches('/')
-                .to_string(),
+            bluemap_database,
+            bluemap_live,
             dynmap_worlds,
             assets_database: optional("MAP_ASSETS_DATABASE"),
             assets_origins: list(

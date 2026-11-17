@@ -14,7 +14,7 @@ TypeScript を直したときや、ケースを足したいときは、次のと
 
 ```sh
 # TORO-API のルートで。1 つ目は画面側のリポジトリ、2 つ目 (省略できる) は旧サーバー側のリポジトリ
-node tools/gen-sign-vectors.mjs <TORO-3D-WebMap のパス> <TORO-WebMap のパス>
+node tools/gen-sign-vectors.mjs <TORO-3D-WebMap のパス> <旧サーバー側のリポジトリのパス>
 ```
 
 - Node.js 22.18 以降 (TypeScript をそのまま読み込めるバージョン)。古いバージョンでは `node --experimental-strip-types` で実行します。

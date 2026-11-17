@@ -1,6 +1,6 @@
 //! 数と量の上限 (1 つの IP からの数・量、同時に読む数) と、読んだものの置き場 (古いものから消す)。
 //!
-//! 正本 (移管前) は TORO-WebMap の `server/lib/marumasign/limits.ts`。
+//! 正本 (移管前) は、移管前の地図サーバーの `server/lib/marumasign/limits.ts`。
 
 use std::collections::HashMap;
 use std::net::IpAddr;
