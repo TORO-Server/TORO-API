@@ -30,6 +30,60 @@ pub struct Config {
     pub mc_status_addr: String,
     /// 尋ねるときに名乗るホスト名 (Velocity の forced-hosts 用)
     pub mc_status_host: String,
+
+    /// 地図 API (/map/v1 と /live/plugin) の設定
+    pub map: MapConfig,
+}
+
+/// 地図 API が読む Dynmap の DB (TiDB)。読み取り専用の利用者を使う
+#[derive(Clone)]
+pub struct MapDb {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    /// Dynmap のデータベース名
+    pub database: String,
+}
+
+/// 地図 API の設定。`MAP_DB_HOST` が無ければ、地図 API は動かさない (`/map/v1/*` は 404)
+#[derive(Clone, Default)]
+pub struct MapConfig {
+    pub db: Option<MapDb>,
+    /// `/live/plugin` を受ける内部専用の待受 (host:port)。無ければ内部の待受を起動しない
+    pub live_addr: Option<String>,
+    /// `/live/plugin` の `X-Toro-Token` の期待値。空ならどんな値も通さない
+    pub live_token: String,
+}
+
+impl MapConfig {
+    pub fn from_env() -> Result<Self, String> {
+        let db = match optional("MAP_DB_HOST") {
+            None => None,
+            Some(host) => Some(MapDb {
+                host,
+                port: or_default("MAP_DB_PORT", "4000")
+                    .parse()
+                    .map_err(|_| "MAP_DB_PORT must be a number".to_string())?,
+                user: optional("MAP_DB_USER").ok_or_else(|| {
+                    "missing environment variables: MAP_DB_USER (required when MAP_DB_HOST is set)"
+                        .to_string()
+                })?,
+                // 空のパスワードも許す (開発用の TiDB)
+                password: std::env::var("MAP_DB_PASSWORD").unwrap_or_default(),
+                database: or_default("MAP_DYNMAP_DATABASE", "dynmap"),
+            }),
+        };
+        let live_addr = optional("MAP_LIVE_ADDR");
+        if live_addr.is_some() && db.is_none() {
+            return Err("MAP_LIVE_ADDR requires MAP_DB_HOST".to_string());
+        }
+        Ok(Self {
+            db,
+            live_addr,
+            live_token: std::env::var("MAP_LIVE_TOKEN").unwrap_or_default(),
+        })
+    }
 }
 
 fn optional(name: &str) -> Option<String> {
@@ -77,6 +131,7 @@ impl Config {
             body_read_timeout_secs: 30,
             mc_status_addr: or_default("MC_STATUS_ADDR", "toro-velocity:25565"),
             mc_status_host: or_default("MC_STATUS_HOST", "torosaba.net"),
+            map: MapConfig::from_env()?,
         })
     }
 }
