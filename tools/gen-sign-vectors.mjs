@@ -5,8 +5,11 @@
 //   node tools/gen-sign-vectors.mjs <TORO-3D-WebMap のパス> [<旧サーバー側のリポジトリのパス>] [--out <出力先>]
 //
 // - 1 つ目の引数: 正本 (app/bluemap/marumasign/{core,manifest,xml-head}.ts) があるリポジトリ
-// - 2 つ目の引数 (省略できる): サーバー側の本体 (server/lib/marumasign/{allow,kinds,limits,net}.ts) があるリポジトリ。
-//   origin/main の内容を git で取り出して使う (取り出せなければ作業ツリーのファイル)。省略すると、サーバー側の項目は出力しない
+// - 2 つ目の引数 (省略できる): サーバー側の本体 (server/lib/marumasign/{allow,kinds,limits,net}.ts) があった TORO-WebMap のリポジトリ。
+//   サーバー側のコードは TORO-WebMap から除去済みで、最後の状態はタグ pre-server-removal にある。
+//   ベクタは凍結済み (tests/vectors/marumasign-shared.json は作り直さない)。サーバー側の項目をやむを得ず再生成するときは、
+//   そのタグをチェックアウトした (またはタグを取得した) リポジトリを渡す。ファイルはタグから git で取り出す (main や作業ツリーは読まない)。
+//   省略すると、サーバー側の項目は出力しない (凍結したベクタのサーバー側の項目が消えるので、省略したまま出力先を上書きしない)
 // - 出力先の既定: tests/vectors/marumasign-shared.json
 //
 // TypeScript は Node の型除去 (Node 22.18 以降は既定で有効。古い Node では `node --experimental-strip-types` で実行) で
@@ -17,6 +20,9 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+/** サーバー側のコードを含む TORO-WebMap の最後の状態を指すタグ (除去の PR より前に付けた) */
+const SERVER_TAG = 'pre-server-removal'
 
 const args = process.argv.slice(2)
 let out = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'tests', 'vectors', 'marumasign-shared.json')
@@ -49,13 +55,8 @@ const server = {}
 if (webmap) {
   for (const f of ['allow', 'kinds', 'limits', 'net']) {
     const rel = `server/lib/marumasign/${f}.ts`
-    let text
-    try {
-      text = execFileSync('git', ['-C', webmap, 'show', `origin/main:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-    }
-    catch {
-      text = readFileSync(join(webmap, rel), 'utf8')
-    }
+    // 凍結したタグから取り出す。タグが無ければ失敗させる (除去後の main や作業ツリーを黙って読まない)
+    const text = execFileSync('git', ['-C', webmap, 'show', `${SERVER_TAG}:${rel}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
     writeFileSync(join(work, `${f}.ts`), text)
     sources[`${f}.ts`] = sha(text)
   }
