@@ -1,4 +1,4 @@
-//! 2D 地図の API (Dynmap の DB を読んで返す)。移管前の TORO-WebMap のサーバー側 (toro-webmap) の置き換え。
+//! 2D 地図の API (Dynmap の DB を読んで返す)。移管前の TORO-WebMap のサーバー側 (地図サーバー) の置き換え。
 //!
 //! - `api`: `/map/v1/configuration`、`/map/v1/world/{world}/{ts}`、`/map/v1/tiles/...` (HTTP)
 //! - `ws`: `/map/v1/ws` (ブラウザとの WebSocket。公開の待受)
