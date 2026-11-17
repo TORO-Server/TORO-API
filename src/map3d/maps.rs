@@ -2,7 +2,7 @@
 //! (CORS の違いだけ、すべての応答に `Access-Control-Allow-Origin` が付く)。
 //!
 //! - `settings.json`、`textures.json`、`tiles/...`、`assets/...`: DB (`bluemap`) から。保存済みの gzip はそのまま返す
-//! - `live/players.json`、`live/markers.json`、`live/sse`: toro-main の内蔵サーバーから (DB は失敗時の最終版)
+//! - `live/players.json`、`live/markers.json`、`live/sse`: toro-main の内蔵サーバーから (DB は失敗時の最後のバージョン)
 //!
 //! 鍵の名前は BlueMap 5.x の `KeyedMapStorage` と同じ。
 
@@ -182,7 +182,7 @@ async fn unknown_map(svc: &Arc<Map3d>, map: &str) -> Option<Response> {
     }
 }
 
-/// `live/players.json`: toro-main に聞く。止まっているときは DB の最後の版
+/// `live/players.json`: toro-main に聞く。止まっているときは DB の最後のバージョン
 async fn players(svc: &Arc<Map3d>, ctx: &Ctx, map: &str) -> Response {
     if let Some(res) = unknown_map(svc, map).await {
         return res;
@@ -236,7 +236,7 @@ async fn bluemap_markers(svc: &Arc<Map3d>, map: &str) -> serde_json::Map<String,
     {
         return sets;
     }
-    // toro-main の再起動中など。DB の最後の版にする
+    // toro-main の再起動中など。DB の最後のバージョンにする
     let Ok(Some(found)) = svc.store.item(map, "bluemap:markers").await else {
         return Default::default();
     };

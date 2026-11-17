@@ -331,7 +331,7 @@ fn iso_image(b: &[u8]) -> Option<&'static str> {
     }
 }
 
-/// 先頭が NBT (名前つきの複合タグ) らしいか。`little` はリトルエンディアン (統合版の .mcstructure)
+/// 先頭が NBT (名前つきの複合タグ) らしいか。`little` はリトルエンディアン (Bedrock Edition の .mcstructure)
 pub fn looks_like_nbt(b: &[u8], little: bool) -> bool {
     if b.len() < 6 || b[0] != 10 {
         return false;

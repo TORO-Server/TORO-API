@@ -1,6 +1,6 @@
 //! `/map3d/v1/mcassets/...`: 構造物の看板を描くための Minecraft のリソース。移管前の toro-webmap の `/mcassets/*` の置き換え。
 //!
-//! - `index.json`: いまの版 (hash)。jar が無い、または作っている途中なら 503
+//! - `index.json`: いまのバージョン (hash)。jar が無い、または作っている途中なら 503
 //! - `<hash>/assets.json`: blockstates、models、アイテム、バイオームの色など (br、gzip、無圧縮)
 //! - `<hash>/textures.bin`: テクスチャの PNG を並べたもの (位置は assets.json の textures)
 //! - `<hash>/unifont/<4 桁の 16 進>.txt`: Unifont の 256 文字分 (jar のフォントにない文字。持たないページは 204)
@@ -12,27 +12,27 @@
 //! `McAssets::new` が背景の仕事 (`tokio::spawn`、重い処理は `spawn_blocking`) として、`MAP_MCASSETS_JAR` の jar からまとめを作り始める
 //! (jar は 40 MB ほど、作るのは数秒。brotli の品質 11 が重い)。作り終わるまでは `index.json` は 503。
 //! jar を作り直す必要があるかは、10 分に 1 度、リクエストのついでに確かめる (jar の場所・大きさ・更新時刻が変わったら作り直す)。
-//! `MAP_MCASSETS_JAR` がフォルダなら、その中の `minecraft-client-<版>.jar` のうち最も新しい版を使う (BlueMap の `main/bluemap`)。
+//! `MAP_MCASSETS_JAR` がフォルダなら、その中の `minecraft-client-<バージョン>.jar` のうち最も新しいバージョンを使う (BlueMap の `main/bluemap`)。
 //! 作れなかったときは、前に作ったものを返し続け、前がなければ 30 秒おきにリクエストのついでにやり直す。
 //!
 //! # メモリ (`budget.rs` の外の、mcassets だけの常駐)
-//! 作ったものはメモリに持つ。1 つの版 (hash) あたり、実際の jar (26.3) で次のとおり:
+//! 作ったものはメモリに持つ。1 つのバージョン (hash) あたり、実際の jar (26.3) で次のとおり:
 //!
 //! | もの | 大きさ |
 //! |---|---|
 //! | assets.json (無圧縮) | 2.5 MB |
 //! | assets.json (br、gzip) | 126 KB、200 KB |
 //! | textures.bin | 1.18 MB |
-//! | Unifont のページ | 数 MB (版をまたいで 1 つを共有する) |
+//! | Unifont のページ | 数 MB (バージョンをまたいで 1 つを共有する) |
 //!
-//! 合わせて 10 MB 前後。版は新旧の 2 つまで持つ (読み込み中のブラウザーのため) ので、最大でその 2 倍。
-//! 版 1 つが `MAX_RESIDENT_BYTES` (32 MiB) を超えるまとめは、持たずに捨てる (壊れた jar や巨大なリソースパックで増やさない)。
+//! 合わせて 10 MB 前後。バージョンは新旧の 2 つまで持つ (読み込み中のブラウザーのため) ので、最大でその 2 倍。
+//! バージョン 1 つが `MAX_RESIDENT_BYTES` (32 MiB) を超えるまとめは、持たずに捨てる (壊れた jar や巨大なリソースパックで増やさない)。
 //! 作っている最中は、jar の中身を 1 つずつ読んで、JSON の断片を足していく (jar 全体も、JSON の木もメモリに載せない)。
 //! 返すときは本文を 1 度コピーする (2.5 MB。304 のときはコピーしない)。`budget.rs` の 2 つのキャッシュの合計 (256 MiB) とは別で、
 //! 合わせても現行のコンテナの上限 (512 MiB) に収まる (下の定数の確認)。
 //!
 //! # 環境変数
-//! - `MAP_MCASSETS_JAR`: client の jar か、`minecraft-client-<版>.jar` があるフォルダ。無ければこの機能を動かさない (index は 503)
+//! - `MAP_MCASSETS_JAR`: client の jar か、`minecraft-client-<バージョン>.jar` があるフォルダ。無ければこの機能を動かさない (index は 503)
 //! - `MAP_MCASSETS_CACHE`: Unifont の zip を保存する、書き込める場所。無ければメモリだけ (作り直すたびに取り直す)
 //! - `MAP_MCASSETS_RESOURCES_URL`: Unifont の配布元 (既定 `https://resources.download.minecraft.net`)
 //! - `MAP_MCASSETS_MOJANG_API_URL`、`MAP_MCASSETS_MOJANG_SERVICES_URL`、`MAP_MCASSETS_MOJANG_SESSION_URL`:
@@ -62,9 +62,9 @@ use build::Unifont;
 use skin::{Query, Resolved, SkinResolver, Upstreams};
 
 const MIB: usize = 1024 * 1024;
-/// 版 1 つが常駐してよい大きさの上限 (assets.json の 3 つの形、textures.bin、Unifont の合計)
+/// バージョン 1 つが常駐してよい大きさの上限 (assets.json の 3 つの形、textures.bin、Unifont の合計)
 const MAX_RESIDENT_BYTES: usize = 32 * MIB;
-/// 持つ版の数 (いまのものと、ひとつ前)
+/// 持つバージョンの数 (いまのものと、ひとつ前)
 const MAX_BUILDS: usize = 2;
 // このサービスのコンテナの上限 (512 MiB) に、`budget` のキャッシュの合計と、mcassets の常駐が収まる
 const _: () = assert!(budget::TOTAL_CACHE_BYTES + MAX_BUILDS * MAX_RESIDENT_BYTES <= 384 * MIB);
@@ -79,7 +79,7 @@ const UNIFONT_TIMEOUT: Duration = Duration::from_secs(30);
 /// mcassets の設定 (環境変数 `MAP_MCASSETS_*`)
 #[derive(Clone, Debug)]
 pub struct McAssetsConfig {
-    /// client の jar か、`minecraft-client-<版>.jar` があるフォルダ。None ならこの機能を動かさない
+    /// client の jar か、`minecraft-client-<バージョン>.jar` があるフォルダ。None ならこの機能を動かさない
     pub jar: Option<PathBuf>,
     /// Unifont の zip の保存先。None ならメモリだけ
     pub cache: Option<PathBuf>,
@@ -138,14 +138,14 @@ impl McAssetsConfig {
     }
 }
 
-/// 作った版の、ログに出すもの
+/// 作ったバージョンの、ログに出すもの
 struct Meta {
     version: String,
     texture_count: usize,
     millis: u128,
 }
 
-/// 返せる 1 つの版
+/// 返せる 1 つのバージョン
 struct Served {
     hash: String,
     index_json: Vec<u8>,
@@ -157,7 +157,7 @@ struct Served {
 }
 
 impl Served {
-    /// 常駐するおおよその大きさ (Unifont は版をまたいで共有するが、ここでは 1 つぶんを数える)
+    /// 常駐するおおよその大きさ (Unifont はバージョンをまたいで共有するが、ここでは 1 つぶんを数える)
     fn resident_bytes(&self) -> usize {
         self.index_json.len()
             + self.json.len()
@@ -177,7 +177,7 @@ struct State {
     last_attempt: Option<Instant>,
     /// 最後に jar を確かめた時刻
     last_check: Option<Instant>,
-    /// いまの版を作ったときの jar の場所・大きさ・更新時刻
+    /// いまのバージョンを作ったときの jar の場所・大きさ・更新時刻
     stamp: String,
     last_error: String,
     unifont: Option<Arc<Unifont>>,
@@ -518,7 +518,7 @@ pub async fn handle(mc: &Arc<McAssets>, ctx: &Ctx, rest: &str) -> Response {
             Body3 {
                 data: a.index_json.clone(),
                 content_type: "application/json",
-                // jar を差し替えたときに、5 分ほどで新しい版に移る
+                // jar を差し替えたときに、5 分ほどで新しいバージョンに移る
                 cache: "public, max-age=300",
                 etag: None,
                 encoding: None,

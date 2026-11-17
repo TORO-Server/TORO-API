@@ -281,3 +281,128 @@ fn sniff_matches() {
         }
     }
 }
+
+// ---------------------------------------------------------------- サーバー側 (許可リスト、種類の判別、アドレス、上限の鍵)
+
+use toro_api::map3d::sign::allow::{sign_urls, site_of};
+use toro_api::map3d::sign::kinds::{ManifestKind, classify, clean_type, looks_like_html};
+use toro_api::map3d::sign::limits::{limit_key, parse_ip};
+use toro_api::map3d::sign::net::{check_url, is_blocked_address};
+
+fn hex_head(v: &Value) -> Vec<u8> {
+    match v.as_str() {
+        Some(h) => from_hex(h),
+        None => expand_hex(v),
+    }
+}
+
+#[test]
+fn sign_urls_matches() {
+    for (i, c) in cases("signUrls").iter().enumerate() {
+        let mut got = std::collections::HashSet::new();
+        sign_urls(&c["data"], &mut got);
+        let mut got: Vec<String> = got.into_iter().collect();
+        got.sort();
+        let mut want = strings(&c["expect"]);
+        want.sort();
+        assert_eq!(got, want, "signUrls #{i}: {}", c["data"]);
+    }
+}
+
+#[test]
+fn site_of_matches() {
+    for c in cases("siteOf") {
+        let url = c["url"].as_str().unwrap();
+        assert_eq!(site_of(url), c["expect"].as_str().unwrap(), "{url}");
+    }
+}
+
+#[test]
+fn looks_like_html_matches() {
+    for (i, c) in cases("looksLikeHtml").iter().enumerate() {
+        assert_eq!(
+            looks_like_html(&hex_head(&c["head"])),
+            c["expect"].as_bool().unwrap(),
+            "looksLikeHtml #{i}: {}",
+            c["head"]
+        );
+    }
+}
+
+#[test]
+fn classify_matches() {
+    for c in cases("classify") {
+        let name = c["name"].as_str().unwrap();
+        let got = classify(
+            &hex_head(&c["head"]),
+            c["type"].as_str().unwrap_or(""),
+            c["ext"].as_str().unwrap_or(""),
+            c["child"].as_bool().unwrap_or(false),
+            c["foreign"].as_bool().unwrap_or(false),
+        );
+        let want = &c["expect"];
+        if want.is_null() || want.as_object().is_some_and(|o| o.is_empty()) {
+            assert!(got.is_none(), "classify {name}: 返さないはず: {got:?}");
+            continue;
+        }
+        let got = got.unwrap_or_else(|| panic!("classify {name}: 返すはず"));
+        assert_eq!(got.name, want["name"].as_str().unwrap(), "{name} name");
+        assert_eq!(got.cap, want["cap"].as_u64().unwrap(), "{name} cap");
+        assert_eq!(got.ty, want["type"].as_str().unwrap(), "{name} type");
+        let manifest = match got.manifest {
+            Some(ManifestKind::Hls) => Some("hls"),
+            Some(ManifestKind::Dash) => Some("dash"),
+            Some(ManifestKind::Gltf) => Some("gltf"),
+            None => None,
+        };
+        assert_eq!(manifest, want["manifest"].as_str(), "{name} manifest");
+        assert_eq!(got.stream, want["stream"].as_bool().unwrap_or(false), "{name} stream");
+    }
+}
+
+#[test]
+fn clean_type_matches() {
+    for c in cases("cleanType") {
+        assert_eq!(
+            clean_type(c["value"].as_str()),
+            c["expect"].as_str().unwrap(),
+            "{}",
+            c["value"]
+        );
+    }
+}
+
+#[test]
+fn blocked_addresses_match() {
+    for c in cases("isBlockedAddress") {
+        let ip = c["ip"].as_str().unwrap();
+        let want = c["expect"].as_bool().unwrap();
+        // IP アドレスとして読めないものは、TS では「つながない」(true)
+        let got = match parse_ip(ip) {
+            Some(addr) => is_blocked_address(&addr),
+            None => true,
+        };
+        assert_eq!(got, want, "{ip}");
+    }
+}
+
+#[test]
+fn limit_keys_match() {
+    for c in cases("limitKey") {
+        let ip = c["ip"].as_str().unwrap();
+        assert_eq!(limit_key(ip), c["expect"].as_str().unwrap(), "{ip}");
+    }
+}
+
+#[test]
+fn check_url_matches() {
+    for c in cases("checkUrl") {
+        let value = expand(&c["value"]);
+        assert_eq!(
+            check_url(&value).as_deref(),
+            c["expect"].as_str(),
+            "{}",
+            &value[..value.len().min(80)]
+        );
+    }
+}
