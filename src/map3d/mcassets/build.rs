@@ -20,7 +20,7 @@ use sha2::{Digest, Sha256};
 use super::jsjson;
 use super::zip::ZipFile;
 
-/// まとめの形の版 (変えたら上げる。URL の hash に入る)
+/// まとめの形のバージョン (変えたら上げる。URL の hash に入る)
 pub const FORMAT: u32 = 1;
 
 /// 1 枚のテクスチャの大きさの上限 (巨大な画像を配らない)
@@ -459,7 +459,7 @@ pub fn parse_unifont(zip_bytes: &[u8]) -> io::Result<Unifont> {
     Ok(out)
 }
 
-/// 版の名前 (26.3、26.10、26.3.1 など) を、数の部分ごとに比べる
+/// バージョンの名前 (26.3、26.10、26.3.1 など) を、数の部分ごとに比べる
 pub fn compare_versions(a: &str, b: &str) -> Ordering {
     fn numbers(s: &str) -> Vec<i64> {
         let mut out = Vec::new();
@@ -488,7 +488,7 @@ pub fn compare_versions(a: &str, b: &str) -> Ordering {
     a.cmp(b)
 }
 
-/// client の jar の場所。ファイルならそれ、フォルダなら、その中の `minecraft-client-<版>.jar` のうち版が最も新しいもの
+/// client の jar の場所。ファイルならそれ、フォルダなら、その中の `minecraft-client-<バージョン>.jar` のうちバージョンが最も新しいもの
 /// (BlueMap がダウンロードする名前。Minecraft を更新しても設定を変えなくてよい)。見つからなければ None
 pub fn resolve_client_jar(path: &Path) -> Option<PathBuf> {
     let meta = std::fs::metadata(path).ok()?;
