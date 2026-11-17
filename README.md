@@ -8,6 +8,7 @@ TORO Server の REST API のサーバーです。Rust で書かれています�
 
 - Wiki の原稿の読み取り・一覧・全文検索・保存
 - Minecraft サーバーの稼働状態
+- 2D 地図の API (`/map/v1/*`。Dynmap の DB を読んで、地図の画面 map.torosaba.net に返す。WebSocket の `/map/v1/ws` を含む)
 - 各サービスの URL の一覧
 
 パス・認証の要否・パラメーターの正本は [assets/openapi/openapi.json](assets/openapi/openapi.json) です (動いているサーバーの `GET /openapi.json` でも同じものが返ります)。
