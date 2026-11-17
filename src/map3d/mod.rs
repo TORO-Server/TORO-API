@@ -63,6 +63,8 @@ pub struct Map3dConfig {
     pub grace_minutes: u64,
     /// 入口のプロキシが `/live/clients` に送るときの合言葉 (`MAP_CLIENTS_TOKEN`)。空なら受け付けない
     pub clients_token: String,
+    /// /live/clients と /healthz だけを受ける追加の内部専用の待受 (host:port。MAP_CLIENTS_ADDR)。無ければ起動しない
+    pub clients_addr: Option<String>,
     pub mcassets: mcassets::McAssetsConfig,
     pub sign: sign::SignConfig,
 }
@@ -104,6 +106,7 @@ impl Map3dConfig {
                 .parse()
                 .map_err(|_| "MAP_ASSETS_GRACE_MINUTES must be a number".to_string())?,
             clients_token: std::env::var("MAP_CLIENTS_TOKEN").unwrap_or_default(),
+            clients_addr: optional("MAP_CLIENTS_ADDR"),
             mcassets: mcassets::McAssetsConfig::from_env()?,
             sign: sign::SignConfig::from_env()?,
         })
