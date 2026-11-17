@@ -257,6 +257,7 @@ pub async fn start_with(customize: impl FnOnce(&mut Config)) -> TestServer {
         mc_status_addr: "127.0.0.1:9".into(),
         mc_status_host: "torosaba.net".into(),
         map: Default::default(),
+        map3d: Default::default(),
     };
     customize(&mut cfg);
 

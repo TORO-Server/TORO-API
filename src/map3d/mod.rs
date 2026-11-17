@@ -20,12 +20,15 @@ pub mod clients;
 pub mod hub;
 pub mod live;
 pub mod maps;
+pub mod markers;
 pub mod mcassets;
 pub mod sign;
 pub mod store;
 pub mod ws;
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use axum::body::Body;
 use axum::http::header::{self, HeaderMap, HeaderValue};
@@ -101,6 +104,10 @@ impl Map3dConfig {
     }
 }
 
+/// Dynmap の地点の変換結果 (Dynmap のワールド → 読んだ時刻と、BlueMap のマーカーの組)
+pub type DynmapCache =
+    Mutex<HashMap<String, (Instant, serde_json::Map<String, serde_json::Value>)>>;
+
 /// 3D 地図 API が持つもの
 pub struct Map3d {
     pub cfg: Map3dConfig,
@@ -114,6 +121,8 @@ pub struct Map3d {
     /// `/_assets/`。`MAP_ASSETS_DATABASE` が無ければ None
     pub assets: Option<assets::Assets>,
     pub clients: Arc<clients::Clients>,
+    /// Dynmap の地点の変換結果 (30 秒。BlueMap の地図の id に対応する Dynmap のワールドごと)
+    pub dynmap_markers: DynmapCache,
 }
 
 impl Map3d {
@@ -124,14 +133,21 @@ impl Map3d {
     ) -> Option<Arc<Self>> {
         let database = cfg.map.db.as_ref()?;
         let bluemap = cfg.map3d.bluemap_database.as_ref()?;
-        let store: Arc<dyn BluemapStore> = Arc::new(store::SqlxBluemapStore::new(database, bluemap));
+        let store: Arc<dyn BluemapStore> =
+            Arc::new(store::SqlxBluemapStore::new(database, bluemap));
         let assets = cfg.map3d.assets_database.as_ref().map(|name| {
             assets::Assets::new(
                 Arc::new(assets::SqlxAssetStore::new(database, name)),
                 cfg.map3d.assets_origins.clone(),
             )
         });
-        Some(Self::with_parts(cfg.map3d.clone(), map, store, http, assets))
+        Some(Self::with_parts(
+            cfg.map3d.clone(),
+            map,
+            store,
+            http,
+            assets,
+        ))
     }
 
     /// 部品を差し替えて作る (試験用)
@@ -162,6 +178,7 @@ impl Map3d {
             mcassets,
             assets,
             clients,
+            dynmap_markers: Mutex::new(HashMap::new()),
         })
     }
 }
@@ -199,8 +216,10 @@ async fn route(svc: &Arc<Map3d>, ctx: &Ctx) -> Response {
     }
     if ctx.method != Method::GET && ctx.method != Method::HEAD {
         let mut res = error(405, "Method Not Allowed");
-        res.headers_mut()
-            .insert(header::ALLOW, HeaderValue::from_static("GET, HEAD, OPTIONS"));
+        res.headers_mut().insert(
+            header::ALLOW,
+            HeaderValue::from_static("GET, HEAD, OPTIONS"),
+        );
         return res;
     }
     let rest = ctx.path.strip_prefix("/map3d/v1/").unwrap_or("");

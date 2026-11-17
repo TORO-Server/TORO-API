@@ -36,13 +36,14 @@ async fn main() {
     );
 
     // dynmap-live からの位置の受信 (/live/plugin) は、公開の待受とは別の、内部専用の待受だけで受ける
+    let map3d = app.map3d.clone();
     if let (Some(addr), Some(map)) = (app.cfg.map.live_addr.clone(), app.map.clone()) {
         let internal = tokio::net::TcpListener::bind(&addr)
             .await
             .expect("bind MAP_LIVE_ADDR");
-        eprintln!("internal listener (/live/plugin) on {addr}");
+        eprintln!("internal listener (/live/plugin, /live/clients) on {addr}");
         tokio::spawn(async move {
-            axum::serve(internal, toro_api::map::live::router(map))
+            axum::serve(internal, toro_api::map::live::router_with(map, map3d))
                 .with_graceful_shutdown(shutdown_signal())
                 .await
                 .expect("internal server");

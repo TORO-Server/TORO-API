@@ -159,6 +159,7 @@ pub fn base_config() -> Config {
         mc_status_addr: "127.0.0.1:9".into(),
         mc_status_host: "torosaba.net".into(),
         map: Default::default(),
+        map3d: Default::default(),
     }
 }
 
