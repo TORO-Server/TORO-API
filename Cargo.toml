@@ -8,11 +8,19 @@ publish = false
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
 base64 = "0.23"
+# 看板: glTF の JSON の読み取り (数を読み飛ばして、範囲外の数でも失敗しないようにする)
+serde = "1"
+# mcassets: assets.json の brotli (品質 11)。純 Rust (C のライブラリを引かない)
+brotli = { version = "9", default-features = false, features = ["std"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 md-5 = "0.11"
 # scratch イメージで動かすので、CA 証明書は OS から読まない (rustls-tls = webpki-roots を埋め込む)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+# mcassets: 移管前 (Node) の JSON.stringify と同じ数の値にするため、float_roundtrip (小数の読み取りを正確にする) を足す
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+# mcassets: Mojang の Unifont の zip の確認 (配布元の SHA-1)
+sha1 = "0.11"
 sha2 = "0.11"
 # 地図 API の DB (Dynmap の TiDB)。純 Rust で、OpenSSL も zlib も引かない。TLS は使わない (内部ネットワークだけ)
 sqlx = { version = "0.9", default-features = false, features = ["mysql", "runtime-tokio"] }
