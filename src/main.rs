@@ -50,6 +50,26 @@ async fn main() {
         });
     }
 
+    // `/live/clients` だけを受ける追加の内部専用の待受 (Velocity の送り先が別のポートのとき用)。env が無ければ起動しない
+    if let Some(addr) = app.cfg.map3d.clients_addr.clone() {
+        let Some(map3d) = app.map3d.clone() else {
+            eprintln!(
+                "config error: MAP_CLIENTS_ADDR requires MAP_DB_HOST and MAP_BLUEMAP_DATABASE"
+            );
+            std::process::exit(2);
+        };
+        let extra = tokio::net::TcpListener::bind(&addr)
+            .await
+            .expect("bind MAP_CLIENTS_ADDR");
+        eprintln!("clients listener (/live/clients, /healthz) on {addr}");
+        tokio::spawn(async move {
+            axum::serve(extra, toro_api::map::live::clients_router(map3d))
+                .with_graceful_shutdown(shutdown_signal())
+                .await
+                .expect("clients server");
+        });
+    }
+
     axum::serve(listener, toro_api::routes::router(app))
         .with_graceful_shutdown(shutdown_signal())
         .await
