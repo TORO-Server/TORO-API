@@ -33,6 +33,11 @@ URL の正本は 1 か所です。別の場所に書き写さないでくださ�
 | トークンの確認 | `src/identity.rs` | `tests/service.rs` |
 | OpenAPI 仕様 | `src/openapi.rs` `assets/openapi/` | `tests/service.rs` |
 | 入り口、URL の一覧 | `src/api.rs` `src/site.rs` | `tests/service.rs` |
+| 2D 地図の HTTP (`/map/v1/configuration` `/world/...` `/tiles/...`) | `src/map/api.rs` | `tests/map.rs` |
+| 2D 地図の WebSocket (`/map/v1/ws`) と配信ハブ | `src/map/ws.rs` `src/map/hub.rs` | `tests/map_ws.rs` `tests/map_hub.rs` |
+| dynmap-live からの位置の受信 (`/live/plugin`。内部専用) | `src/map/live.rs` | `tests/map_ws.rs` |
+| Dynmap の DB の読み取り (SELECT だけ) | `src/map/store.rs` | `tests/common/fake_map.rs` (偽の DB) |
+| 移管前の実装 (JavaScript) と同じ結果にする道具 | `src/map/js.rs` | 同じファイル内 |
 
 共通の部品: `src/routes.rs` (URL の振り分け)、`src/http.rs` (応答と CORS)、`src/config.rs`。
 
@@ -57,3 +62,21 @@ URL を足すには、機能のモジュールにハンドラーを書き、`src
 
 - 匿名の Wiki の読み取りは、サーバーの GitHub トークンの枠を使う。レート制限で守る
 - 検索の索引はメモリの中だけ。再起動すると、最初の検索で原稿を読み直す
+
+## 地図 API (`src/map/`)
+
+2D 地図の画面 (map.torosaba.net) が読む API です。移管前は toro-webmap (TORO-WebMap のサーバー側) が返していて、応答は同じです (ヘッダー、ETag、本文、異常系のクセまで)。違うのは、未知のワールドの 404 の本文が HTML でなく JSON であることと、このサービス共通の `X-Content-Type-Options: nosniff` が付くことだけです。
+
+- **Dynmap の DB を読む**: TiDB の `dynmap` データベースを読みます (地図の表示のための読み取り)。**発行するのは SELECT だけ**で、文は `src/map/store.rs` の定数に固定してあります (値は必ず bind)。接続は `MAP_DB_*` で決め、`MAP_DB_HOST` が無ければ地図 API は動きません (`/map/v1/*` は 404)。本番では読み取り専用の専用利用者を使います
+- **ドライバは sqlx** (`mysql` と `runtime-tokio` だけ。TLS なし)。純 Rust で、OpenSSL も zlib も依存に入らないので、musl の静的リンク (scratch イメージ) のままビルドできます。`mysql_async` は zlib (`libz-sys`) の C のビルドを引くので選びませんでした。接続は最初の問い合わせまで張らず、プールは 16 本、1 つの問い合わせは 30 秒で切ります
+- **キャッシュ**: HTTP の各ハンドラーは毎回 DB を引きます。HTTP のキャッシュは前段の toro-edge が担います。WebSocket のハブだけが、ワールドごとに 1 秒に 1 度だけ DB を読み、`timestamp` が変わったときだけ全員へ送ります (ワールドの一覧は 30 秒ごとに読み直し、知らない名前では DB を読みません)
+- **公開の待受と内部専用の待受を分ける**: 公開の待受 (`PORT`。Tunnel の先) は `/map/v1/*` だけを受け、`/live/*` は 404 です。dynmap-live からの位置 (`/live/plugin`) は、`MAP_LIVE_ADDR` で決めた内部専用の待受でだけ受けます (決めなければ待受を起動しません)。`X-Toro-Token` を SHA-256 にして定数時間で比べ、`MAP_LIVE_TOKEN` が空ならどんな値も通しません。この待受を Tunnel の規則に載せないでください
+- **WebSocket は、ボディを読む前に分ける**: ふつうの要求は本文を全部読む作りなので、`/map/v1/ws` の Upgrade は `src/routes.rs` の入り口で先に分けます。同時処理の枠 (256) は使わず、接続数は別に数えます (ブラウザ 2048、`/live/plugin` 8)。1 つのメッセージは 256 KiB まで、ブラウザからの購読は 512 文字までで、2 秒に 5 通を超えたものは無視します。Origin は空、`localhost`、`127.0.0.1`、`*.torosaba.net` だけを許し、他は接続のあとで 1008 で閉じます
+- **3D (BlueMap) は含みません**: `/map/v1/ws` の `{"bluemap":"<map>"}` は 3D 用で、この段階では未対応です (黙って無視します)。3D の動的な側は、あとの段階で `src/map/` の隣に足します
+- **JavaScript と同じ結果にする道具** (`src/map/js.rs`): `Number()`、`decodeURI`、`decodeURIComponent`、`Date#toUTCString`、`JSON.stringify` の数の書き方を、移管前と同じに再現しています (パスの数字やワールド名の解き方で、同じ入力が同じ応答になるように)
+
+### 安全のための決まり (地図 API)
+
+- タイルや顔のパスは、`..` を含むものと、壊れた `%` を含むものを blank.png にします (500 にしない)
+- 認証は無い API です (公開の地図の読み取り)。CORS は `Access-Control-Allow-Origin: *`
+- DB の書き込みは、このサービスから行いません。DB の利用者の権限も SELECT だけにしてください

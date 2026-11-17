@@ -12,7 +12,7 @@ use axum::response::Response;
 use serde_json::json;
 
 use crate::http::{self, Ctx};
-use crate::{App, api, openapi, wiki};
+use crate::{App, api, map, openapi, wiki};
 
 const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 
@@ -21,7 +21,13 @@ pub fn router(app: Arc<App>) -> Router {
 }
 
 async fn dispatch(State(app): State<Arc<App>>, request: Request) -> Response {
-    let mut res = answer(&app, request).await;
+    // WebSocket の Upgrade は、ボディを先に読む通常の経路より前で分ける (同時処理の枠も使わない。接続数は map 側で数える)
+    let mut res = match &app.map {
+        Some(map) if map::ws::is_ws_path(request.uri().path()) && map::ws::is_upgrade(&request) => {
+            map::ws::accept(map.clone(), request).await
+        }
+        _ => answer(&app, request).await,
+    };
     let headers = res.headers_mut();
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
@@ -64,6 +70,12 @@ async fn answer(app: &App, request: Request) -> Response {
 }
 
 async fn route(app: &App, ctx: &Ctx) -> Response {
+    // 地図 API。MAP_DB_HOST が無ければ動かさない (404)。`/live/*` は、ここ (公開の待受) には無い
+    if ctx.path.starts_with("/map/v1/")
+        && let Some(map) = &app.map
+    {
+        return map::api::handle(map, ctx).await;
+    }
     if ctx.method == Method::OPTIONS {
         return http::no_content(http::cors_headers(ctx));
     }
