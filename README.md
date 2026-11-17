@@ -19,7 +19,7 @@ cargo test   # 試験。偽の認証サービスと偽の GitHub を自動で立
 cargo run    # 動かす。環境変数 GITHUB_TOKEN と AUTH_INTERNAL_URL が要ります
 ```
 
-設定の名前と既定値の正本は [.env.example](.env.example) です。秘密の値 (`GITHUB_TOKEN`) だけを、リポジトリの外の環境変数に書きます。
+設定の名前と既定値の正本は [.env.example](.env.example) です。秘密の値 (`GITHUB_TOKEN`) だけを、置き場の外の環境変数に書きます。
 
 ## 関連文書
 
