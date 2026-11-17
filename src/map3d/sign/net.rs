@@ -7,7 +7,7 @@
 //! - 転送は自分で追い、行き先ごとに同じ確かめをする (5 回まで)
 //! - Cookie・Referer・ブラウザーの頭書きは送らない
 //!
-//! 正本 (移管前) は TORO-WebMap の `server/lib/marumasign/net.ts`。
+//! 正本 (移管前) は、移管前の地図サーバーの `server/lib/marumasign/net.ts`。
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};

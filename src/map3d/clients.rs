@@ -1,5 +1,5 @@
-//! いまつながっているプレイヤーの IP。TORO-Proxy (Velocity) が、人の出入りがあったとき (イベント駆動) に
-//! `/live/clients` へ全員分を送ってくる。入口の Velocity が見ている接続元なので、Paper の再起動中に待っている人も含む。
+//! いまつながっているプレイヤーの IP。入口のプロキシ が、人の出入りがあったとき (イベント駆動) に
+//! `/live/clients` へ全員分を送ってくる。入口のプロキシが見ている接続元なので、Paper の再起動中に待っている人も含む。
 //!
 //! どう確かめるか (ログアウト後の猶予、知らせが途絶えたときの扱い) はここで決める。
 //! **IP はメモリにだけ置き、ログにも DB にも残さない。** `/_assets/` を読んでよいプレイヤーかの判定にだけ使う。
@@ -9,7 +9,7 @@ use std::net::{IpAddr, Ipv6Addr};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-/// 知らせが途絶えたら (Velocity が止まった、など)、最後の一覧をこの時間まで信じる
+/// 知らせが途絶えたら (入口のプロキシが止まった、など)、最後の一覧をこの時間まで信じる
 const SNAPSHOT_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 /// 1 度に受ける IP の数の上限
 pub const MAX_IPS: usize = 2000;
@@ -63,7 +63,7 @@ impl Clients {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// TORO-Proxy からの全員分の一覧で入れ替える。いなくなった IP は、いなくなった時刻を覚えておく
+    /// 入口のプロキシからの全員分の一覧で入れ替える。いなくなった IP は、いなくなった時刻を覚えておく
     pub fn update(&self, ips: &[String]) {
         self.update_at(ips, Instant::now());
     }

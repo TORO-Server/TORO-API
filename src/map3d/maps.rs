@@ -1,8 +1,8 @@
-//! `/map3d/v1/maps/{地図}/...`: BlueMap の地図のデータ。移管前の toro-webmap の `/maps/<地図>/...` と同じ応答を返す
+//! `/map3d/v1/maps/{地図}/...`: BlueMap の地図のデータ。移管前の地図サーバーの `/maps/<地図>/...` と同じ応答を返す
 //! (CORS の違いだけ、すべての応答に `Access-Control-Allow-Origin` が付く)。
 //!
 //! - `settings.json`、`textures.json`、`tiles/...`、`assets/...`: DB (`bluemap`) から。保存済みの gzip はそのまま返す
-//! - `live/players.json`、`live/markers.json`、`live/sse`: toro-main の内蔵サーバーから (DB は失敗時の最後のバージョン)
+//! - `live/players.json`、`live/markers.json`、`live/sse`: BlueMap 内蔵のサーバーから (DB は失敗時の最後のバージョン)
 //!
 //! 鍵の名前は BlueMap 5.x の `KeyedMapStorage` と同じ。
 
@@ -182,7 +182,7 @@ async fn unknown_map(svc: &Arc<Map3d>, map: &str) -> Option<Response> {
     }
 }
 
-/// `live/players.json`: toro-main に聞く。止まっているときは DB の最後のバージョン
+/// `live/players.json`: BlueMap 内蔵のサーバーに聞く。止まっているときは DB の最後のバージョン
 async fn players(svc: &Arc<Map3d>, ctx: &Ctx, map: &str) -> Response {
     if let Some(res) = unknown_map(svc, map).await {
         return res;
@@ -236,7 +236,7 @@ async fn bluemap_markers(svc: &Arc<Map3d>, map: &str) -> serde_json::Map<String,
     {
         return sets;
     }
-    // toro-main の再起動中など。DB の最後のバージョンにする
+    // Minecraft サーバーの再起動中など。DB の最後のバージョンにする
     let Ok(Some(found)) = svc.store.item(map, "bluemap:markers").await else {
         return Default::default();
     };
@@ -272,7 +272,7 @@ async fn dynmap_markers(svc: &Arc<Map3d>, map: &str) -> serde_json::Map<String, 
     sets
 }
 
-/// `live/sse`: toro-main の SSE を流す (WebSocket の裏側の購読と共有する)。
+/// `live/sse`: BlueMap 内蔵のサーバーの SSE を流す (WebSocket の裏側の購読と共有する)。
 /// つながりが切れたら、こちらも閉じる (ブラウザの EventSource がつなぎ直す)
 async fn sse(svc: &Arc<Map3d>, ctx: &Ctx, map: &str) -> Response {
     if let Some(res) = unknown_map(svc, map).await {

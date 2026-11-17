@@ -6,7 +6,7 @@
 //! - サーバー→ブラウザ:
 //!   - `{"type":"bluemap","map":"<id>","state":"open|error"}`: BlueMap 本体につながっているか (つなぎ直すたびに変わる)
 //!   - `{"type":"bluemap","map":"<id>","event":"player|tile|marker","data":"<BlueMap の SSE の JSON を文字列のまま>"}`
-//!   - `{"type":"ping"}`: 見ている地図があるあいだ 30 秒ごと (toro-edge は 120 秒何も流れない WebSocket を切る)
+//!   - `{"type":"ping"}`: 見ている地図があるあいだ 30 秒ごと (前段のプロキシは 120 秒何も流れない WebSocket を切る)
 //! - 知らない地図の id は `state:"error"` だけ返し、BlueMap へつなぎに行かない (接続は保つ)
 
 use std::sync::Arc;

@@ -1,5 +1,5 @@
 //! 構造物の中のプレイヤーの頭で、名前か UUID しか書かれていないもののスキンの URL を、Mojang のサーバーに問い合わせて返す
-//! (`/map3d/v1/mcassets/skin`)。TORO-WebMap の `server/utils/skin-lookup.ts` と `lib/marumasign/limits.ts` の移植。
+//! (`/map3d/v1/mcassets/skin`)。移管前の地図サーバーの `server/utils/skin-lookup.ts` と `lib/marumasign/limits.ts` の移植。
 //!
 //! 問い合わせる先は決まったもの (名前 → UUID は api.mojang.com、だめなら api.minecraftservices.com。UUID → textures は
 //! sessionserver.mojang.com。どれも設定で差し替えられる) だけで、ブラウザーから受け取るのは、形を確かめた名前か UUID だけ

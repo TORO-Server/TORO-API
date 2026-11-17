@@ -1,5 +1,5 @@
 //! zip (jar) の中のファイルを読む小さなもの (Minecraft のクライアントの jar と、Unifont の zip)。
-//! TORO-WebMap の `server/utils/zip.ts` の移植。中央ディレクトリだけを先に読み、ファイルはそのつど位置を指定して読む
+//! 移管前の地図サーバーの `server/utils/zip.ts` の移植。中央ディレクトリだけを先に読み、ファイルはそのつど位置を指定して読む
 //! (jar 全体をメモリに載せない)。deflate (8) と無圧縮 (0)、zip64 の大きさと位置だけを扱う。
 
 use std::collections::HashMap;

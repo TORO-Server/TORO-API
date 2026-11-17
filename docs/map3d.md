@@ -46,7 +46,7 @@ Minecraft サーバー内蔵の BlueMap のサーバーにあり、この API �
 | 名前 | 内容 |
 | --- | --- |
 | `MAP_BLUEMAP_DATABASE` | BlueMap のデータベースの名前。無ければ 3D 地図 API は動かさない |
-| `MAP_BLUEMAP_LIVE` | BlueMap 内蔵のサーバーの URL |
+| `MAP_BLUEMAP_LIVE` | BlueMap 内蔵のサーバーの URL。`MAP_BLUEMAP_DATABASE` を決めたときは必須 (既定値なし。未設定なら起動時にエラーで止まる) |
 | `MAP_BLUEMAP_DYNMAP_WORLDS` | マーカーに地点を足す Dynmap のワールド (`地図=ワールド,...`) |
 | `MAP_ASSETS_DATABASE` | 看板の画像を持つデータベースの名前。無ければ `/_assets/` は動かさない |
 | `MAP_ASSETS_ORIGINS` | `/_assets/` を読んでよい地図のページの Origin (`,` 区切り) |

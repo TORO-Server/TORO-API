@@ -2,7 +2,7 @@
 // 看板 (MarumaSign) の共有ロジックの、入出力の試験ベクタ (JSON) を作る。
 //
 // 使い方 (TORO-API のルートで):
-//   node tools/gen-sign-vectors.mjs <TORO-3D-WebMap のパス> [<TORO-WebMap のパス>] [--out <出力先>]
+//   node tools/gen-sign-vectors.mjs <TORO-3D-WebMap のパス> [<旧サーバー側のリポジトリのパス>] [--out <出力先>]
 //
 // - 1 つ目の引数: 正本 (app/bluemap/marumasign/{core,manifest,xml-head}.ts) があるリポジトリ
 // - 2 つ目の引数 (省略できる): サーバー側の本体 (server/lib/marumasign/{allow,kinds,limits,net}.ts) があるリポジトリ。
@@ -26,7 +26,7 @@ for (let i = 0; i < args.length; i++) {
   else positional.push(args[i])
 }
 if (positional.length < 1) {
-  console.error('usage: node tools/gen-sign-vectors.mjs <TORO-3D-WebMap> [<TORO-WebMap>] [--out <file>]')
+  console.error('usage: node tools/gen-sign-vectors.mjs <TORO-3D-WebMap> [<旧サーバー側のリポジトリ>] [--out <file>]')
   process.exit(2)
 }
 const canonicalDir = join(resolve(positional[0]), 'app', 'bluemap', 'marumasign')

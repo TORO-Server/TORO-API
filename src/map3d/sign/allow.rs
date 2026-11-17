@@ -5,7 +5,7 @@
 //! - それらの再生リスト (HLS, MPEG-DASH) と .gltf に書かれた URL (サーバーが自分で読んで取り出したもの)。
 //!   再生リストと別のサイトのものは、中継できる中身をさらに絞る (`kinds::classify`)
 //!
-//! 正本 (移管前) は TORO-WebMap の `server/lib/marumasign/allow.ts`。
+//! 正本 (移管前) は、移管前の地図サーバーの `server/lib/marumasign/allow.ts`。
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};

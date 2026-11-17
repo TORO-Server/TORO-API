@@ -1,6 +1,6 @@
 //! BlueMap のライブ情報 (プレイヤーの位置、描き直したタイル、マーカーの変更) の中継。
 //!
-//! BlueMap 内蔵の Web サーバー (toro-main の 8100 番) の `live/sse` を、見ている地図ごとに **1 本だけ**つなぎ、
+//! BlueMap 内蔵の Web サーバー の `live/sse` を、見ている地図ごとに **1 本だけ**つなぎ、
 //! 届いたイベントを、その地図を見ている WebSocket (`/map3d/v1/ws`) と SSE (`/map3d/v1/maps/{地図}/live/sse`) の
 //! 閲覧者全員へ配る。見る人がいなくなったら、BlueMap とのつなぎをやめる。切れたら、間を置いてつなぎ直す。
 //!
@@ -246,7 +246,7 @@ async fn run(
                 }
             }
         }
-        // toro-main の再起動中など。つなぎ直す
+        // Minecraft サーバーの再起動中など。つなぎ直す
         open.send_replace(false);
         tokio::select! {
             () = stop.notified() => return,

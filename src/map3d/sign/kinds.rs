@@ -2,7 +2,7 @@
 //!
 //! 先頭のバイト列で決める (`core::sniff`。Content-Type は信じない)。HTML は返さない。
 //! 返すときの Content-Type は決まったものだけ (画像・動画・音声のほかは `application/octet-stream`)。本当の種類は `X-MarumaSign-Type` で知らせる。
-//! 正本 (移管前) は TORO-WebMap の `server/lib/marumasign/kinds.ts`。
+//! 正本 (移管前) は、移管前の地図サーバーの `server/lib/marumasign/kinds.ts`。
 
 use super::core::{MAX_IMAGE_BYTES, MAX_PDF_BYTES, Sniffed, sniff};
 use super::xml_head::starts_after_xml_head;

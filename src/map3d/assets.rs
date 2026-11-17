@@ -1,9 +1,9 @@
 //! `/_assets/{id}.{拡張子}` (assets.torosaba.net)。MarumaSign Companion がホストした看板の画像など。
-//! toro-edge が、assets.torosaba.net の `/<id>.<拡張子>` を `/_assets/<id>.<拡張子>` に付け替えて送ってくる。
+//! 前段のプロキシが、assets.torosaba.net の `/<id>.<拡張子>` を `/_assets/<id>.<拡張子>` に付け替えて送ってくる。
 //!
 //! 読めるのは、次のどちらかだけ (ほかのサイトに貼られたり、ただの置き場として使われたりしないように):
-//! - いま TORO で遊んでいるプレイヤーの IP から (MarumaSign の Mod が看板を読む)。IP は toro-edge が `X-Toro-Client-Ip` で
-//!   渡し、遊んでいる人の IP は TORO-Proxy (Velocity) が `/live/clients` で知らせてくる (`clients`)
+//! - いま TORO で遊んでいるプレイヤーの IP から (MarumaSign の Mod が看板を読む)。IP は前段のプロキシが `X-Toro-Client-Ip` で
+//!   渡し、遊んでいる人の IP は 入口のプロキシ が `/live/clients` で知らせてくる (`clients`)
 //! - 地図のページ (map. / 3d-map.torosaba.net) から。ブラウザが付ける Origin (3D の看板は CORS で読む) か Referer
 //!
 //! Origin と Referer はブラウザでないものなら自由に書けるので、これはほかのサイトへの貼り付けの抑止で、非公開にする仕組みではない。
