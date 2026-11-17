@@ -33,6 +33,8 @@ pub struct Config {
 
     /// 地図 API (/map/v1 と /live/plugin) の設定
     pub map: MapConfig,
+    /// 3D 地図 API (/map3d/v1、/_assets、/live/clients) の設定
+    pub map3d: crate::map3d::Map3dConfig,
 }
 
 /// 地図 API が読む Dynmap の DB (TiDB)。読み取り専用の利用者を使う
@@ -86,11 +88,11 @@ impl MapConfig {
     }
 }
 
-fn optional(name: &str) -> Option<String> {
+pub(crate) fn optional(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
-fn or_default(name: &str, default: &str) -> String {
+pub(crate) fn or_default(name: &str, default: &str) -> String {
     optional(name).unwrap_or_else(|| default.to_string())
 }
 
@@ -132,6 +134,7 @@ impl Config {
             mc_status_addr: or_default("MC_STATUS_ADDR", "toro-velocity:25565"),
             mc_status_host: or_default("MC_STATUS_HOST", "torosaba.net"),
             map: MapConfig::from_env()?,
+            map3d: crate::map3d::Map3dConfig::from_env()?,
         })
     }
 }

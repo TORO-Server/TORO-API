@@ -14,6 +14,7 @@ pub mod config;
 pub mod http;
 pub mod identity;
 pub mod map;
+pub mod map3d;
 pub mod minecraft;
 pub mod openapi;
 pub mod routes;
@@ -41,6 +42,8 @@ pub struct App {
     pub server_status: Mutex<Option<(Instant, Value)>>,
     /// 地図 API。MAP_DB_HOST が無ければ None (/map/v1/* は 404)
     pub map: Option<Arc<map::MapService>>,
+    /// 3D 地図 API。MAP_DB_HOST と MAP_BLUEMAP_DATABASE が無ければ None (/map3d/v1/* は 404)
+    pub map3d: Option<Arc<map3d::Map3d>>,
 }
 
 impl App {
@@ -58,6 +61,9 @@ impl App {
                 cfg.map.live_token.clone(),
             )
         });
+        let map3d = map
+            .clone()
+            .and_then(|service| map3d::Map3d::new(&cfg, service, http.clone()));
         Ok(Self {
             cfg,
             http,
@@ -65,6 +71,7 @@ impl App {
             wiki_index: wiki::search::Index::new(wiki_index_ttl),
             server_status: Mutex::new(None),
             map,
+            map3d,
         })
     }
 }
