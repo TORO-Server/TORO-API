@@ -10,7 +10,7 @@ use sqlx::{ConnectOptions, Row};
 
 use crate::config::MapDb;
 
-/// 1 つの問い合わせの時間 (toro-edge が返事を待つ長さと同じ)
+/// 1 つの問い合わせの時間 (入り口のプロキシが返事を待つ長さと同じ)
 const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 /// 接続の上限 (TiDB は 1 台なので、地図の配信には 16 本あれば足りる)
 const MAX_CONNECTIONS: u32 = 16;
