@@ -15,13 +15,6 @@ pub const ASSET_CHUNK_CACHE_BYTES: usize = 160 * MIB;
 /// 2 つのキャッシュの合計の上限
 pub const TOTAL_CACHE_BYTES: usize = 256 * MIB;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn caches_fit_in_the_total_budget() {
-        assert!(SIGN_BODY_CACHE_BYTES + ASSET_CHUNK_CACHE_BYTES <= TOTAL_CACHE_BYTES);
-        assert!(SIGN_BODY_CACHE_ENTRY_BYTES <= SIGN_BODY_CACHE_BYTES);
-    }
-}
+// 2 つのキャッシュの合計が上限に収まること (足したときに、ここで気づく)
+const _: () = assert!(SIGN_BODY_CACHE_BYTES + ASSET_CHUNK_CACHE_BYTES <= TOTAL_CACHE_BYTES);
+const _: () = assert!(SIGN_BODY_CACHE_ENTRY_BYTES <= SIGN_BODY_CACHE_BYTES);
