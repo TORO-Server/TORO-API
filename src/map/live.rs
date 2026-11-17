@@ -1,6 +1,9 @@
 //! `/live/plugin`: TORO-Core の dynmap-live (Minecraft サーバーの中) からの WebSocket。
 //! 全員の位置と体力が 0.25 秒ごとに届く。**内部専用の待受 (`MAP_LIVE_ADDR`) だけ**で受ける。
 //! 公開の待受 (Tunnel の先) には、この経路を出さない (`/live/*` は 404)。さらに `X-Toro-Token` で確かめる。
+//!
+//! 同じ内部専用の待受で、`POST /live/clients` (TORO-Proxy が、いまつながっているプレイヤーの IP を全員分送ってくる) も受ける。
+//! 合言葉は `MAP_CLIENTS_TOKEN` (`/live/plugin` の合言葉とは別)。IP は `crate::map3d::clients` がメモリにだけ置く。
 
 use std::sync::Arc;
 
@@ -14,6 +17,8 @@ use sha2::{Digest, Sha256};
 
 use super::MapService;
 use super::ws::MAX_PAYLOAD;
+use crate::map3d::Map3d;
+use crate::map3d::clients::parse_ips;
 
 /// 合言葉を比べる。どちらも SHA-256 にしてから比べるので、長さが違っても (マルチバイトの文字でも)
 /// 例外にならず、時間で中身が漏れない。決めた合言葉が空なら、どんな値でも通さない
@@ -30,9 +35,28 @@ pub fn token_matches(given: &str, expected: &str) -> bool {
         == 0
 }
 
+/// 内部専用の待受の状態
+#[derive(Clone)]
+struct Internal {
+    map: Arc<MapService>,
+    /// `/live/clients` を受けるとき (3D 地図 API が動いているときだけ)
+    map3d: Option<Arc<Map3d>>,
+}
+
+/// `/live/clients` の本文の大きさの上限 (2,000 件 × 64 文字より十分大きい)
+const MAX_CLIENTS_BODY: usize = 256 * 1024;
+const CLIENTS_BODY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// 内部専用の待受のルーター (`/live/plugin` と `/healthz` だけ)
 pub fn router(map: Arc<MapService>) -> Router {
-    Router::new().fallback(dispatch).with_state(map)
+    router_with(map, None)
+}
+
+/// 内部専用の待受のルーター (`/live/clients` も受けるとき)
+pub fn router_with(map: Arc<MapService>, map3d: Option<Arc<Map3d>>) -> Router {
+    Router::new()
+        .fallback(dispatch)
+        .with_state(Internal { map, map3d })
 }
 
 fn text_response(status: StatusCode, text: &'static str) -> Response {
@@ -47,7 +71,8 @@ fn text_response(status: StatusCode, text: &'static str) -> Response {
     res
 }
 
-async fn dispatch(State(map): State<Arc<MapService>>, request: Request) -> Response {
+async fn dispatch(State(state): State<Internal>, request: Request) -> Response {
+    let Internal { map, map3d } = state;
     match request.uri().path() {
         "/healthz" => {
             let mut res = Response::new(json!({ "ok": true }).to_string().into());
@@ -58,8 +83,44 @@ async fn dispatch(State(map): State<Arc<MapService>>, request: Request) -> Respo
             res
         }
         "/live/plugin" => plugin(map, request).await,
+        "/live/clients" => match map3d {
+            Some(map3d) => clients(map3d, request).await,
+            None => text_response(StatusCode::NOT_FOUND, "Not Found"),
+        },
         _ => text_response(StatusCode::NOT_FOUND, "Not Found"),
     }
+}
+
+/// `POST /live/clients`: `{"ips":["…"]}` (最大 2,000 件、各 64 文字以内)。合言葉は `X-Toro-Token`。成功は 204
+async fn clients(map3d: Arc<Map3d>, request: Request) -> Response {
+    let given = request
+        .headers()
+        .get("x-toro-token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !token_matches(given, &map3d.cfg.clients_token) {
+        return text_response(StatusCode::FORBIDDEN, "Forbidden");
+    }
+    if request.method() != axum::http::Method::POST {
+        return text_response(StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed");
+    }
+    let body = request.into_body();
+    let body = match tokio::time::timeout(
+        CLIENTS_BODY_TIMEOUT,
+        axum::body::to_bytes(body, MAX_CLIENTS_BODY),
+    )
+    .await
+    {
+        Ok(Ok(body)) => body,
+        _ => return text_response(StatusCode::BAD_REQUEST, "Bad Request"),
+    };
+    let Some(ips) = parse_ips(&body) else {
+        return text_response(StatusCode::BAD_REQUEST, "Bad Request");
+    };
+    map3d.clients.update(&ips);
+    let mut res = Response::new(axum::body::Body::empty());
+    *res.status_mut() = StatusCode::NO_CONTENT;
+    res
 }
 
 async fn plugin(map: Arc<MapService>, request: Request) -> Response {

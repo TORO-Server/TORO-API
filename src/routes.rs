@@ -12,7 +12,7 @@ use axum::response::Response;
 use serde_json::json;
 
 use crate::http::{self, Ctx};
-use crate::{App, api, map, openapi, wiki};
+use crate::{App, api, map, map3d, openapi, wiki};
 
 const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 
@@ -22,8 +22,13 @@ pub fn router(app: Arc<App>) -> Router {
 
 async fn dispatch(State(app): State<Arc<App>>, request: Request) -> Response {
     // WebSocket の Upgrade は、ボディを先に読む通常の経路より前で分ける (同時処理の枠も使わない。接続数は map 側で数える)
-    let mut res = match &app.map {
-        Some(map) if map::ws::is_ws_path(request.uri().path()) && map::ws::is_upgrade(&request) => {
+    let upgrade = map::ws::is_upgrade(&request);
+    let path = request.uri().path();
+    let mut res = match (&app.map, &app.map3d) {
+        (_, Some(map3d)) if upgrade && map3d::is_ws_path(path) => {
+            map3d::ws::accept(map3d.clone(), request).await
+        }
+        (Some(map), _) if upgrade && map::ws::is_ws_path(path) => {
             map::ws::accept(map.clone(), request).await
         }
         _ => answer(&app, request).await,
@@ -75,6 +80,15 @@ async fn route(app: &App, ctx: &Ctx) -> Response {
         && let Some(map) = &app.map
     {
         return map::api::handle(map, ctx).await;
+    }
+    // 3D 地図 API (MAP_BLUEMAP_DATABASE が無ければ動かさない)。/_assets/ は assets.torosaba.net から toro-edge が付け替えて送る
+    if let Some(map3d) = &app.map3d {
+        if map3d::is_path(&ctx.path) {
+            return map3d::handle(map3d, ctx).await;
+        }
+        if ctx.path.starts_with("/_assets/") {
+            return map3d::assets::handle(map3d, ctx).await;
+        }
     }
     if ctx.method == Method::OPTIONS {
         return http::no_content(http::cors_headers(ctx));
