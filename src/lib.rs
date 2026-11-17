@@ -3,6 +3,7 @@
 //! - `api`: 入り口 (URL の一覧と、トークンの持ち主)
 //! - `wiki`: GitHub 上の Wiki 原稿の読み書きと検索
 //! - `minecraft`: Minecraft サーバーの稼働状態の取得
+//! - `map`: 2D 地図の API (`/map/v1/*`。Dynmap の DB を読む) と、dynmap-live からの位置の受信 (内部専用)
 //! - `openapi`: OpenAPI 仕様
 //! - `identity`: Bearer トークンの確認 (auth に尋ねる)
 //!
@@ -12,6 +13,7 @@ pub mod api;
 pub mod config;
 pub mod http;
 pub mod identity;
+pub mod map;
 pub mod minecraft;
 pub mod openapi;
 pub mod routes;
@@ -19,6 +21,7 @@ pub mod site;
 pub mod util;
 pub mod wiki;
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use config::Config;
@@ -36,6 +39,8 @@ pub struct App {
     pub wiki_index: wiki::search::Index,
     /// 最後に尋ねた Minecraft サーバーの稼働状態 (要求のたびにつながないため)
     pub server_status: Mutex<Option<(Instant, Value)>>,
+    /// 地図 API。MAP_DB_HOST が無ければ None (/map/v1/* は 404)
+    pub map: Option<Arc<map::MapService>>,
 }
 
 impl App {
@@ -46,12 +51,20 @@ impl App {
             .timeout(Duration::from_secs(30))
             .user_agent("TORO-API")
             .build()?;
+        // 接続は最初の問い合わせまで張らない (DB が先に起動していなくても、サービスは立ち上がる)
+        let map = cfg.map.db.as_ref().map(|db| {
+            map::MapService::new(
+                Arc::new(map::store::SqlxStore::new(db)),
+                cfg.map.live_token.clone(),
+            )
+        });
         Ok(Self {
             cfg,
             http,
             requests: Semaphore::new(MAX_CONCURRENT_REQUESTS),
             wiki_index: wiki::search::Index::new(wiki_index_ttl),
             server_status: Mutex::new(None),
+            map,
         })
     }
 }

@@ -16,6 +16,8 @@ use serde_json::{Value, json};
 use toro_api::App;
 use toro_api::config::Config;
 
+pub mod fake_map;
+
 pub const WIKI_ORIGIN: &str = "https://wiki.torosaba.net";
 
 /// 編集できる利用者のトークン
@@ -254,6 +256,7 @@ pub async fn start_with(customize: impl FnOnce(&mut Config)) -> TestServer {
         // 誰も待っていないポート
         mc_status_addr: "127.0.0.1:9".into(),
         mc_status_host: "torosaba.net".into(),
+        map: Default::default(),
     };
     customize(&mut cfg);
 
