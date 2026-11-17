@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
 base64 = "0.23"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 md-5 = "0.11"
 # scratch イメージで動かすので、CA 証明書は OS から読まない (rustls-tls = webpki-roots を埋め込む)
