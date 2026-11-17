@@ -6,14 +6,22 @@ description = "TORO Server の REST API (api.torosaba.net)"
 publish = false
 
 [dependencies]
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
 base64 = "0.23"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
+md-5 = "0.11"
 # scratch イメージで動かすので、CA 証明書は OS から読まない (rustls-tls = webpki-roots を埋め込む)
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.11"
+# 地図 API の DB (Dynmap の TiDB)。純 Rust で、OpenSSL も zlib も引かない。TLS は使わない (内部ネットワークだけ)
+sqlx = { version = "0.9", default-features = false, features = ["mysql", "runtime-tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time", "io-util"] }
 url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
+tokio-tungstenite = "0.29"
 
 [profile.release]
 lto = true
