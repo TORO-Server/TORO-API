@@ -94,16 +94,18 @@ impl<R: Read + Seek> ZipFile<R> {
         let mut dir_offset = u64::from(u32_at(&end, at + 16));
         // zip64
         if (dir_offset == 0xFFFF_FFFF || count == 0xFFFF)
-            && at >= 20 && u32_at(&end, at - 20) == 0x0706_4B50 {
-                let eocd64 = u64_at(&end, at - 20 + 8);
-                let rec = self.read_at(eocd64, 56)?;
-                if u32_at(&rec, 0) != 0x0606_4B50 {
-                    return Err(bad("bad zip64 record"));
-                }
-                count = u64_at(&rec, 32);
-                dir_size = u64_at(&rec, 40);
-                dir_offset = u64_at(&rec, 48);
+            && at >= 20
+            && u32_at(&end, at - 20) == 0x0706_4B50
+        {
+            let eocd64 = u64_at(&end, at - 20 + 8);
+            let rec = self.read_at(eocd64, 56)?;
+            if u32_at(&rec, 0) != 0x0606_4B50 {
+                return Err(bad("bad zip64 record"));
             }
+            count = u64_at(&rec, 32);
+            dir_size = u64_at(&rec, 40);
+            dir_offset = u64_at(&rec, 48);
+        }
         if count > MAX_ENTRIES || dir_size > MAX_DIRECTORY || dir_offset + dir_size > self.size {
             return Err(bad("bad central directory"));
         }

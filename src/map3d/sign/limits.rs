@@ -154,7 +154,12 @@ impl Drop for GatePermit {
     fn drop(&mut self) {
         let mut state = lock(&self.gate.state);
         state.0 = state.0.saturating_sub(1);
-        let left = state.1.get(&self.key).copied().unwrap_or(1).saturating_sub(1);
+        let left = state
+            .1
+            .get(&self.key)
+            .copied()
+            .unwrap_or(1)
+            .saturating_sub(1);
         if left == 0 {
             state.1.remove(&self.key);
         } else {
@@ -269,10 +274,7 @@ mod tests {
     fn keys() {
         assert_eq!(limit_key("203.0.113.9"), "203.0.113.9");
         assert_eq!(limit_key("::ffff:203.0.113.9"), "203.0.113.9");
-        assert_eq!(
-            limit_key("2001:db8:1:2:3:4:5:6"),
-            "20010db800010002/64"
-        );
+        assert_eq!(limit_key("2001:db8:1:2:3:4:5:6"), "20010db800010002/64");
         assert_eq!(limit_key("2001:db8:1:2::9"), limit_key("2001:db8:1:2::1"));
         assert_eq!(limit_key("[2001:db8::1]"), limit_key("2001:db8::2"));
         assert_eq!(limit_key("unknown"), "unknown");

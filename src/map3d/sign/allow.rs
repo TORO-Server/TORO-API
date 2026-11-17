@@ -65,10 +65,27 @@ fn origin_of(url: &str) -> &str {
 
 /// 共有ホスティングの公開接尾辞 (借り手ごとにホスト名が分かれるもの)。よく知られたものだけを挙げる
 const SHARED_SUFFIXES: &[&str] = &[
-    "github.io", "gitlab.io", "codeberg.page", "pages.dev", "workers.dev", "netlify.app",
-    "vercel.app", "herokuapp.com", "firebaseapp.com", "web.app", "azurewebsites.net", "glitch.me",
-    "surge.sh", "deno.dev", "fly.dev", "onrender.com", "hf.space", "pythonanywhere.com",
-    "streamlit.app", "repl.co", "replit.app",
+    "github.io",
+    "gitlab.io",
+    "codeberg.page",
+    "pages.dev",
+    "workers.dev",
+    "netlify.app",
+    "vercel.app",
+    "herokuapp.com",
+    "firebaseapp.com",
+    "web.app",
+    "azurewebsites.net",
+    "glitch.me",
+    "surge.sh",
+    "deno.dev",
+    "fly.dev",
+    "onrender.com",
+    "hf.space",
+    "pythonanywhere.com",
+    "streamlit.app",
+    "repl.co",
+    "replit.app",
 ];
 
 /// URL のサイト (登録できるドメイン)。公開接尾辞の全体の一覧は持たないので、co.jp や com.au のような 2 段のものだけを見分ける。
@@ -284,10 +301,16 @@ mod tests {
         sign_urls(&data, &mut urls);
         let mut got: Vec<_> = urls.into_iter().collect();
         got.sort();
-        assert_eq!(got, vec!["https://example.com/a.png", "https://example.com/c.png"]);
+        assert_eq!(
+            got,
+            vec!["https://example.com/a.png", "https://example.com/c.png"]
+        );
         // format が違う、形が違うデータは何も足さない
         let mut none = HashSet::new();
-        sign_urls(&json!({"format": 2, "signs": [[0,0,0,0,0,"https://a.example/x","https://a.example/y"]]}), &mut none);
+        sign_urls(
+            &json!({"format": 2, "signs": [[0,0,0,0,0,"https://a.example/x","https://a.example/y"]]}),
+            &mut none,
+        );
         sign_urls(&json!([1, 2]), &mut none);
         assert!(none.is_empty());
     }
@@ -299,7 +322,10 @@ mod tests {
         assert_eq!(site_of("https://a.b.example.co.jp/x"), "example.co.jp");
         assert_eq!(site_of("https://alice.github.io/x"), "alice.github.io");
         assert_eq!(site_of("https://www.alice.github.io/x"), "alice.github.io");
-        assert_ne!(site_of("https://alice.github.io/"), site_of("https://bob.github.io/"));
+        assert_ne!(
+            site_of("https://alice.github.io/"),
+            site_of("https://bob.github.io/")
+        );
     }
 
     #[test]
@@ -309,7 +335,10 @@ mod tests {
         list.set_roots(["https://a.example/x".to_string()].into());
         assert_eq!(list.allowed("https://a.example/x"), Some(Allowed::Root));
         list.add_alias("https://short.example/y");
-        assert_eq!(list.allowed("https://short.example/y"), Some(Allowed::Alias));
+        assert_eq!(
+            list.allowed("https://short.example/y"),
+            Some(Allowed::Alias)
+        );
         let refs = ManifestRefs {
             urls: vec![
                 "https://cdn.a.example/seg1.ts".to_string(),
@@ -318,8 +347,14 @@ mod tests {
             ..Default::default()
         };
         list.add_refs(refs, "https://a.example/live.m3u8");
-        assert_eq!(list.allowed("https://cdn.a.example/seg1.ts"), Some(Allowed::Child));
-        assert_eq!(list.allowed("https://other.test/seg2.ts"), Some(Allowed::Foreign));
+        assert_eq!(
+            list.allowed("https://cdn.a.example/seg1.ts"),
+            Some(Allowed::Child)
+        );
+        assert_eq!(
+            list.allowed("https://other.test/seg2.ts"),
+            Some(Allowed::Foreign)
+        );
         assert_eq!(list.allowed("https://other.test/seg3.ts"), None);
     }
 }

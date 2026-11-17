@@ -232,9 +232,9 @@ pub fn clean_type(value: Option<&str>) -> String {
         let first_ok = chars.next().is_some_and(|c| c.is_ascii_alphanumeric());
         first_ok
             && part.len() <= 64
-            && part.chars().all(|c| {
-                c.is_ascii_alphanumeric() || "!#$&^_.+-".contains(c)
-            })
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "!#$&^_.+-".contains(c))
     };
     match t.split_once('/') {
         Some((a, b)) if ok_part(a) && ok_part(b) => t,
@@ -264,9 +264,14 @@ mod tests {
                 continue;
             }
             assert!(looks_like_html(head), "{html}");
-            assert!(classify(head, "text/plain", "png", true, false).is_none(), "{html}");
+            assert!(
+                classify(head, "text/plain", "png", true, false).is_none(),
+                "{html}"
+            );
         }
-        assert!(!looks_like_html(b"<svg xmlns=\"http://www.w3.org/2000/svg\">"));
+        assert!(!looks_like_html(
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\">"
+        ));
         assert!(!looks_like_html(b"<abc>"));
         assert!(!looks_like_html(PNG));
     }
