@@ -148,6 +148,7 @@ pub fn base_config() -> Config {
         mcp_url: "https://mcp.torosaba.net".into(),
         wiki_url: "https://wiki.torosaba.net".into(),
         auth_internal_url: "http://127.0.0.1:9".into(),
+        auth_introspect_secret: None,
         cors_origins: vec!["https://wiki.torosaba.net".into()],
         github_token: "gh-token".into(),
         github_owner: "TORO-Server".into(),

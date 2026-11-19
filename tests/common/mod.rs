@@ -50,6 +50,8 @@ pub struct FakeAuth {
     /// true の間は、何を聞かれても 500 を返す
     pub broken: AtomicBool,
     pub requests: Mutex<Vec<String>>,
+    /// 各リクエストの `X-Toro-Token` (無ければ None)
+    pub secrets: Mutex<Vec<Option<String>>>,
 }
 
 async fn start_fake_auth(state: Arc<FakeAuth>) -> String {
@@ -69,6 +71,13 @@ async fn start_fake_auth(state: Arc<FakeAuth>) -> String {
                 .and_then(|v| v["token"].as_str().map(str::to_string))
                 .unwrap_or_default();
             state.requests.lock().unwrap().push(token.clone());
+            state.secrets.lock().unwrap().push(
+                parts
+                    .headers
+                    .get("x-toro-token")
+                    .and_then(|v| v.to_str().ok())
+                    .map(str::to_string),
+            );
             match state.tokens.lock().unwrap().get(&token) {
                 Some(claims) => json_response(200, json!({ "active": true, "claims": claims })),
                 None => json_response(200, json!({ "active": false })),
@@ -245,6 +254,7 @@ pub async fn start_with(customize: impl FnOnce(&mut Config)) -> TestServer {
         mcp_url: "https://mcp.torosaba.net".into(),
         wiki_url: WIKI_ORIGIN.into(),
         auth_internal_url: start_fake_auth(auth).await,
+        auth_introspect_secret: None,
         cors_origins: vec![WIKI_ORIGIN.into()],
         github_token: "gh-token".into(),
         github_owner: "TORO-Server".into(),
