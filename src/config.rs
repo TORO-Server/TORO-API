@@ -13,6 +13,8 @@ pub struct Config {
     pub wiki_url: String,
     /// トークンの確認を頼む、auth の内部の URL (末尾の / なし。公開しない)
     pub auth_internal_url: String,
+    /// auth の `/introspect` へ付ける共有秘密 (`X-Toro-Token`)。auth が `INTROSPECT_SECRET` を設定したときに要る。無ければ付けない
+    pub auth_introspect_secret: Option<String>,
     /// Cookie 付きで API を呼べる Origin (他のサブドメインは信じない)
     pub cors_origins: Vec<String>,
 
@@ -136,6 +138,7 @@ impl Config {
             mcp_url: trimmed("PUBLIC_MCP_URL", "https://mcp.torosaba.net"),
             wiki_url: trimmed("PUBLIC_WIKI_URL", "https://wiki.torosaba.net"),
             auth_internal_url,
+            auth_introspect_secret: optional("AUTH_INTROSPECT_SECRET"),
             cors_origins: or_default("CORS_ORIGINS", "https://wiki.torosaba.net")
                 .split(',')
                 .map(|origin| origin.trim().to_string())
