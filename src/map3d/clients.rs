@@ -51,6 +51,16 @@ fn mapped(v6: &Ipv6Addr) -> Option<[u8; 4]> {
         .then(|| [o[12], o[13], o[14], o[15]])
 }
 
+/// `is_player()` 照合用のキー (IPv4 と `::ffff:` は 4 バイト、IPv6 は `/64` の先頭 8 バイト)。
+/// SLAAC 一時アドレスで下位 64 ビットが変わっても同じ人とみなす (`assets::limit_key` の `/64` 集約と揃える)
+pub fn ip_key(ip: &str) -> Option<Vec<u8>> {
+    let mut b = ip_bytes(ip)?;
+    if b.len() == 16 {
+        b.truncate(8);
+    }
+    Some(b)
+}
+
 impl Clients {
     pub fn new(grace_minutes: u64) -> Arc<Self> {
         Arc::new(Self {
@@ -69,7 +79,7 @@ impl Clients {
     }
 
     pub fn update_at(&self, ips: &[String], now: Instant) {
-        let next: HashSet<Vec<u8>> = ips.iter().filter_map(|ip| ip_bytes(ip)).collect();
+        let next: HashSet<Vec<u8>> = ips.iter().filter_map(|ip| ip_key(ip)).collect();
         let mut s = self.lock();
         let gone: Vec<Vec<u8>> = s.online.difference(&next).cloned().collect();
         for key in gone {
@@ -90,7 +100,7 @@ impl Clients {
     }
 
     pub fn is_player_at(&self, ip: &str, now: Instant) -> bool {
-        let Some(key) = ip_bytes(ip) else {
+        let Some(key) = ip_key(ip) else {
             return false;
         };
         let s = self.lock();
@@ -172,6 +182,32 @@ mod tests {
         clients.update_at(&ips(&["203.0.113.5"]), t0);
         assert!(clients.is_player_at("203.0.113.5", t0 + Duration::from_secs(24 * 3600)));
         assert!(!clients.is_player_at("203.0.113.5", t0 + Duration::from_secs(24 * 3600 + 600)));
+    }
+
+    #[test]
+    fn ipv6_matches_by_64_prefix_while_ipv4_stays_exact() {
+        let clients = Clients::new(10);
+        let t0 = Instant::now();
+        clients.update_at(&ips(&["203.0.113.5", "2001:db8:1:2:aaaa::1"]), t0);
+
+        // 同じ /64 内で下位 64 ビット (一時アドレス等) が変わっても一致する
+        assert!(clients.is_player_at("2001:db8:1:2:bbbb::2", t0));
+        assert!(clients.is_player_at("[2001:db8:1:2:cccc::3]", t0));
+        assert!(clients.is_player_at("2001:db8:1:2:cccc::3%eth0", t0));
+        // 別の /64 は一致しない
+        assert!(!clients.is_player_at("2001:db8:1:3::1", t0));
+
+        // IPv4 (::ffff: 含む) は従来どおり /32 完全一致
+        assert!(clients.is_player_at("203.0.113.5", t0));
+        assert!(clients.is_player_at("::ffff:203.0.113.5", t0));
+        assert!(!clients.is_player_at("203.0.113.6", t0));
+        assert!(!clients.is_player_at("::ffff:203.0.113.6", t0));
+
+        // 猶予期間中も /64 集約で一致し、猶予経過後は失効する
+        let t1 = t0 + Duration::from_secs(60);
+        clients.update_at(&[], t1);
+        assert!(clients.is_player_at("2001:db8:1:2:dddd::4", t1 + Duration::from_secs(9 * 60)));
+        assert!(!clients.is_player_at("2001:db8:1:2:dddd::4", t1 + Duration::from_secs(10 * 60)));
     }
 
     #[test]
