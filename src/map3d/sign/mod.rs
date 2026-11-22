@@ -1057,10 +1057,7 @@ pub fn from_map_page(ctx: &Ctx) -> bool {
         }
         _ => return false,
     }
-    if !origin.is_empty() && origin != "null" && !origin_allowed(origin) {
-        return false;
-    }
-    true
+    !(!origin.is_empty() && origin != "null" && !origin_allowed(origin))
 }
 
 pub struct QueryUrls {
