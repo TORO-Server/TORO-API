@@ -48,10 +48,10 @@ use self::core::extension_of;
 use self::kinds::{
     Kind, MAX_GLTF_PARSE_BYTES, MAX_MANIFEST_BYTES, ManifestKind, classify, clean_type,
 };
-use self::limits::{ByteCache, Gate, GatePermit, WindowLimit, limit_key};
+use self::limits::{ByteCache, Gate, GatePermit, InflightBudget, WindowLimit, limit_key};
 use self::manifest::manifest_refs;
 use self::net::{Outbound, RESOLVE_MAX, UpstreamError, UpstreamRequest, build_client, check_url};
-use super::budget::{SIGN_BODY_CACHE_BYTES, SIGN_BODY_CACHE_ENTRY_BYTES};
+use super::budget::{SIGN_BODY_CACHE_BYTES, SIGN_BODY_CACHE_ENTRY_BYTES, SIGN_INFLIGHT_BYTES};
 use super::live::web_url;
 use super::store::BluemapStore;
 use super::{Body3, error, respond};
@@ -196,6 +196,22 @@ struct LoadState {
     loaded_at: Option<Instant>,
 }
 
+type ProxyCoalesceMap =
+    HashMap<String, Arc<tokio::sync::OnceCell<Result<(CachedBody, bool), (u16, String)>>>>;
+
+struct ProxyCoalesceGuard<'a> {
+    map: &'a Mutex<ProxyCoalesceMap>,
+    key: String,
+    cell: Arc<tokio::sync::OnceCell<Result<(CachedBody, bool), (u16, String)>>>,
+}
+
+impl Drop for ProxyCoalesceGuard<'_> {
+    fn drop(&mut self) {
+        let _ = self.cell.set(Err((503, "busy".to_string())));
+        lock(self.map).remove(&self.key);
+    }
+}
+
 pub struct Sign {
     cfg: SignConfig,
     /// 内部 (BlueMap の内蔵サーバー) へ
@@ -211,10 +227,12 @@ pub struct Sign {
     byte_limit: WindowLimit,
     total_byte_limit: WindowLimit,
     gate: Arc<Gate>,
+    inflight: InflightBudget,
     bodies: ByteCache<CachedBody>,
     kinds: ByteCache<KindEntry>,
     answers: ByteCache<Answer>,
     manifest_reads: Mutex<ManifestReads>,
+    proxy_inflight: Mutex<ProxyCoalesceMap>,
 }
 
 impl Sign {
@@ -239,10 +257,12 @@ impl Sign {
             byte_limit: WindowLimit::new(WINDOW, BYTES_PER_IP),
             total_byte_limit: WindowLimit::new(WINDOW, BYTES_TOTAL),
             gate: Gate::new(GATE_TOTAL, GATE_PER_IP),
+            inflight: InflightBudget::new(SIGN_INFLIGHT_BYTES),
             bodies: ByteCache::new(SIGN_BODY_CACHE_BYTES, 10_000),
             kinds: ByteCache::new(4 * 1024 * 1024, 20_000),
             answers: ByteCache::new(8 * 1024 * 1024, 20_000),
             manifest_reads: Mutex::new(HashMap::new()),
+            proxy_inflight: Mutex::new(HashMap::new()),
         })
     }
 
@@ -391,6 +411,19 @@ impl Sign {
         if res.status().as_u16() != 200 {
             return Err(UpstreamError::new("upstream status", 502));
         }
+        if let Some(len) = res.content_length()
+            && len > MAX_GLTF_PARSE_BYTES
+        {
+            return Err(UpstreamError::new("manifest too large", 413));
+        }
+        let reserve = res
+            .content_length()
+            .map_or(MAX_GLTF_PARSE_BYTES, |n| n.min(MAX_GLTF_PARSE_BYTES))
+            as usize;
+        let _inflight_permit = self
+            .inflight
+            .try_reserve(reserve)
+            .ok_or_else(|| UpstreamError::new("busy", 503))?;
         let mut body = Vec::new();
         while let Some(chunk) = res
             .chunk()
@@ -677,6 +710,79 @@ impl Sign {
             } else {
                 SIGN_BODY_CACHE_ENTRY_BYTES as u64
             };
+            let coalesce_full = !parse && !head_only && range.is_none();
+            if coalesce_full {
+                let (cell, leader) = {
+                    let mut guard = lock(&self.proxy_inflight);
+                    if let Some(existing) = guard.get(url) {
+                        (existing.clone(), false)
+                    } else {
+                        let created = Arc::new(tokio::sync::OnceCell::new());
+                        guard.insert(url.to_string(), created.clone());
+                        (created, true)
+                    }
+                };
+                if !leader {
+                    let outcome = cell
+                        .get_or_init(|| async { Err((503, "busy".to_string())) })
+                        .await;
+                    return match outcome {
+                        Ok((cached, live)) => {
+                            if self.count_bytes(ip, cached.body.len() as u64) {
+                                Err(UpstreamError::new("too many bytes", 429))
+                            } else {
+                                Ok(send_body(cached, range, *live))
+                            }
+                        }
+                        Err((status, msg)) => Err(UpstreamError::new(msg, *status)),
+                    };
+                }
+                let _guard = ProxyCoalesceGuard {
+                    map: &self.proxy_inflight,
+                    key: url.to_string(),
+                    cell: cell.clone(),
+                };
+                let result: Result<(CachedBody, bool), UpstreamError> = async {
+                    let reserve = total.unwrap_or(limit).min(limit) as usize;
+                    let _inflight_permit = self
+                        .inflight
+                        .try_reserve(reserve)
+                        .ok_or_else(|| UpstreamError::new("busy", 503))?;
+                    let all = tokio::time::timeout(FILE_MAX, read_all(&mut res, head, ended, limit))
+                        .await
+                        .map_err(|_| UpstreamError::new("upstream timeout", 504))??;
+                    let cached = CachedBody {
+                        body: Bytes::from(all),
+                        ty: kind.ty,
+                        upstream_type,
+                        url: final_url,
+                        kind: kind.name,
+                    };
+                    if cached.body.len() <= SIGN_BODY_CACHE_ENTRY_BYTES {
+                        self.bodies
+                            .set(url, cached.clone(), cached.body.len(), BODY_TTL);
+                    }
+                    Ok((cached, false))
+                }
+                .await;
+                let shared = match &result {
+                    Ok(v) => Ok(v.clone()),
+                    Err(e) => Err((e.status, e.message.clone())),
+                };
+                let _ = cell.set(shared);
+                drop(_guard);
+                let (cached, live) = result?;
+                if self.count_bytes(ip, cached.body.len() as u64) {
+                    return Err(UpstreamError::new("too many bytes", 429));
+                }
+                return Ok(send_body(&cached, range, live));
+            }
+
+            let reserve = total.unwrap_or(limit).min(limit) as usize;
+            let _inflight_permit = self
+                .inflight
+                .try_reserve(reserve)
+                .ok_or_else(|| UpstreamError::new("busy", 503))?;
             let all = tokio::time::timeout(FILE_MAX, read_all(&mut res, head, ended, limit))
                 .await
                 .map_err(|_| UpstreamError::new("upstream timeout", 504))??;

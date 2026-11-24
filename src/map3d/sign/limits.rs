@@ -266,6 +266,56 @@ impl<T: Clone> ByteCache<T> {
     }
 }
 
+#[derive(Clone)]
+pub struct InflightBudget {
+    inner: Arc<InflightInner>,
+}
+
+struct InflightInner {
+    limit: usize,
+    used: Mutex<usize>,
+}
+
+pub struct InflightPermit {
+    inner: Arc<InflightInner>,
+    bytes: usize,
+}
+
+impl InflightBudget {
+    pub fn new(limit: usize) -> Self {
+        Self {
+            inner: Arc::new(InflightInner {
+                limit,
+                used: Mutex::new(0),
+            }),
+        }
+    }
+
+    pub fn try_reserve(&self, bytes: usize) -> Option<InflightPermit> {
+        let mut used = lock(&self.inner.used);
+        if used.checked_add(bytes)? > self.inner.limit {
+            return None;
+        }
+        *used += bytes;
+        Some(InflightPermit {
+            inner: self.inner.clone(),
+            bytes,
+        })
+    }
+
+    #[cfg(test)]
+    pub fn used_bytes(&self) -> usize {
+        *lock(&self.inner.used)
+    }
+}
+
+impl Drop for InflightPermit {
+    fn drop(&mut self) {
+        let mut used = lock(&self.inner.used);
+        *used = used.saturating_sub(self.bytes);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,5 +390,19 @@ mod tests {
         std::thread::sleep(Duration::from_millis(40));
         assert_eq!(cache.get("a"), None);
         assert_eq!(cache.total_bytes(), 0);
+    }
+
+    #[test]
+    fn inflight_budget_caps_and_releases() {
+        let budget = InflightBudget::new(100);
+        let p1 = budget.try_reserve(60).unwrap();
+        assert!(budget.try_reserve(50).is_none());
+        let p2 = budget.try_reserve(40).unwrap();
+        assert_eq!(budget.used_bytes(), 100);
+        drop(p1);
+        assert_eq!(budget.used_bytes(), 40);
+        assert!(budget.try_reserve(60).is_some());
+        drop(p2);
+        assert_eq!(budget.used_bytes(), 0);
     }
 }
