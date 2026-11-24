@@ -122,12 +122,13 @@ pub async fn accept(map: Arc<MapService>, request: Request) -> Response {
         Some(Ok(origin)) => origin_allowed(Some(origin)),
         Some(Err(_)) => false,
     };
+    let headers = request.headers().clone();
     let upgrade = match WebSocketUpgrade::from_request(request, &()).await {
         Ok(upgrade) => upgrade,
         Err(_) => return upgrade_required(),
     };
     // 接続の数は、ふつうの要求の枠とは別に数える
-    let Ok(permit) = map.ws_slots.clone().try_acquire_owned() else {
+    let Some(permit) = map.acquire_ws(&headers) else {
         return http::busy();
     };
     upgrade
@@ -181,11 +182,15 @@ async fn serve(map: Arc<MapService>, mut socket: WebSocket) {
                 }
                 // `{"bluemap":"<map>"}` は 3D 用。この段階では未対応で、黙って無視する
                 if let Some(world) = subscribe_target(&text) {
+                    if subscriptions.len() >= 16 {
+                        continue;
+                    }
                     let hub = map.hub.clone();
                     let peer = peer.clone();
                     subscriptions.spawn(async move { hub.subscribe(&peer, &world).await });
                 }
             }
+            Some(_) = subscriptions.join_next(), if !subscriptions.is_empty() => {}
             Some(text) = outbox.recv() => {
                 if socket.send(Message::Text(text.into())).await.is_err() {
                     break;

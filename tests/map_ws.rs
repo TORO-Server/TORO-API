@@ -480,3 +480,44 @@ async fn live_plugin_connections_are_limited() {
         other => panic!("{:?}", other.map(|_| ())),
     }
 }
+
+#[tokio::test]
+async fn rapid_resubscribe_leaves_only_one_active_subscription() {
+    let server = start_map(false).await;
+    let mut client = browser(&server).await;
+    for world in ["main", "flat", "main", "flat"] {
+        send(&mut client, &format!(r#"{{"subscribe":"{world}"}}"#)).await;
+    }
+    let msgs = collect(&mut client, LONG).await;
+    assert_eq!(msgs.len(), 4);
+    assert_eq!(server.map.hub.viewer_count(), 1);
+}
+
+#[tokio::test]
+async fn per_ip_ws_limit_caps_concurrent_connections_for_same_client() {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    let server = start_map(false).await;
+    let mut conns = Vec::new();
+    for _ in 0..toro_api::map::MAX_WS_PER_IP {
+        let mut req = format!("ws://{}/map/v1/ws", server.addr)
+            .into_client_request()
+            .unwrap();
+        req.headers_mut()
+            .insert("x-toro-client-ip", "198.51.100.42".parse().unwrap());
+        let (ws, _) = tokio_tungstenite::connect_async(req).await.unwrap();
+        conns.push(ws);
+    }
+    let mut extra = format!("ws://{}/map/v1/ws", server.addr)
+        .into_client_request()
+        .unwrap();
+    extra
+        .headers_mut()
+        .insert("x-toro-client-ip", "198.51.100.42".parse().unwrap());
+    match tokio_tungstenite::connect_async(extra).await {
+        Err(Error::Http(res)) => assert_eq!(res.status(), 503),
+        other => panic!("{:?}", other.map(|_| ())),
+    }
+    // 別の IP からはそのまま繋げる
+    assert!(browser(&server).await.send(Message::Ping(vec![].into())).await.is_ok());
+    drop(conns);
+}

@@ -289,7 +289,7 @@ async fn sse(svc: &Arc<Map3d>, ctx: &Ctx, map: &str) -> Response {
     if ctx.method == Method::HEAD {
         return res;
     }
-    let Ok(permit) = svc.map.ws_slots.clone().try_acquire_owned() else {
+    let Some(permit) = svc.map.acquire_ws(&ctx.headers) else {
         return crate::http::busy();
     };
     let mut sub = svc.hub.subscribe(map);
@@ -322,7 +322,7 @@ pub fn sse_frame(event: &str, data: &str) -> String {
 
 fn sse_stream(
     sub: Subscription,
-    permit: tokio::sync::OwnedSemaphorePermit,
+    permit: crate::map::WsPermit,
 ) -> impl futures_util::Stream<Item = Result<Bytes, Infallible>> {
     // 最初に、つながったことを知らせる (ブラウザの onopen のため)
     let first = Bytes::from_static(b": open\n\n");

@@ -71,12 +71,13 @@ pub async fn accept(svc: Arc<Map3d>, request: Request) -> Response {
             .map(|origin| origin_allowed(Some(origin)))
             .unwrap_or(false),
     };
+    let headers = request.headers().clone();
     let upgrade = match WebSocketUpgrade::from_request(request, &()).await {
         Ok(upgrade) => upgrade,
         Err(_) => return upgrade_required(),
     };
-    // 接続の数は、ふつうの要求の枠とは別に数える (2D の WebSocket と同じ枠)
-    let Ok(permit) = svc.map.ws_slots.clone().try_acquire_owned() else {
+    // 接続の数は、ふつうの要求の枠とは別に数える (全体枠と接続元 IP 枠の両方)
+    let Some(permit) = svc.map.acquire_ws(&headers) else {
         return http::busy();
     };
     upgrade
