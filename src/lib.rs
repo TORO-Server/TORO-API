@@ -38,6 +38,7 @@ pub struct App {
     pub http: reqwest::Client,
     pub requests: Semaphore,
     pub wiki_index: wiki::search::Index,
+    pub wiki_cache: wiki::github::WikiCache,
     /// 最後に尋ねた Minecraft サーバーの稼働状態 (要求のたびにつながないため)
     pub server_status: Mutex<Option<(Instant, Value)>>,
     /// 地図 API。MAP_DB_HOST が無ければ None (/map/v1/* は 404)
@@ -69,6 +70,7 @@ impl App {
             http,
             requests: Semaphore::new(MAX_CONCURRENT_REQUESTS),
             wiki_index: wiki::search::Index::new(wiki_index_ttl),
+            wiki_cache: wiki::github::WikiCache::new(),
             server_status: Mutex::new(None),
             map,
             map3d,

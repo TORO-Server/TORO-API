@@ -198,6 +198,21 @@ struct LoadState {
 
 type ProxyCoalesceMap =
     HashMap<String, Arc<tokio::sync::OnceCell<Result<(CachedBody, bool), (u16, String)>>>>;
+type SignDataCoalesceMap =
+    HashMap<String, Arc<tokio::sync::OnceCell<Result<Option<Vec<u8>>, ()>>>>;
+
+struct SignDataGuard<'a> {
+    map: &'a Mutex<SignDataCoalesceMap>,
+    key: String,
+    cell: Arc<tokio::sync::OnceCell<Result<Option<Vec<u8>>, ()>>>,
+}
+
+impl Drop for SignDataGuard<'_> {
+    fn drop(&mut self) {
+        let _ = self.cell.set(Err(()));
+        lock(self.map).remove(&self.key);
+    }
+}
 
 struct ProxyCoalesceGuard<'a> {
     map: &'a Mutex<ProxyCoalesceMap>,
@@ -233,6 +248,8 @@ pub struct Sign {
     answers: ByteCache<Answer>,
     manifest_reads: Mutex<ManifestReads>,
     proxy_inflight: Mutex<ProxyCoalesceMap>,
+    sign_data_cache: ByteCache<Option<Vec<u8>>>,
+    sign_data_inflight: Mutex<SignDataCoalesceMap>,
 }
 
 impl Sign {
@@ -263,6 +280,8 @@ impl Sign {
             answers: ByteCache::new(8 * 1024 * 1024, 20_000),
             manifest_reads: Mutex::new(HashMap::new()),
             proxy_inflight: Mutex::new(HashMap::new()),
+            sign_data_cache: ByteCache::new(4 * 1024 * 1024, 256),
+            sign_data_inflight: Mutex::new(HashMap::new()),
         })
     }
 
@@ -479,7 +498,39 @@ impl Sign {
     // ------------------------------------------------------------ 経路
 
     async fn sign_data(&self, ctx: &Ctx, id: &str) -> Response {
-        match self.get_web(&["marumasign", &format!("{id}.json")]).await {
+        let fetched = if let Some(cached) = self.sign_data_cache.get(id) {
+            Ok(cached)
+        } else {
+            let (cell, leader) = {
+                let mut guard = lock(&self.sign_data_inflight);
+                if let Some(existing) = guard.get(id) {
+                    (existing.clone(), false)
+                } else {
+                    let created = Arc::new(tokio::sync::OnceCell::new());
+                    guard.insert(id.to_string(), created.clone());
+                    (created, true)
+                }
+            };
+            if leader {
+                let _guard = SignDataGuard {
+                    map: &self.sign_data_inflight,
+                    key: id.to_string(),
+                    cell: cell.clone(),
+                };
+                let res = self.get_web(&["marumasign", &format!("{id}.json")]).await;
+                if let Ok(ref entry) = res {
+                    let bytes = entry.as_ref().map_or(64, |v| v.len().max(64));
+                    self.sign_data_cache
+                        .set(id, entry.clone(), bytes, Duration::from_secs(5));
+                }
+                let _ = cell.set(res.clone());
+                drop(_guard);
+                res
+            } else {
+                cell.get_or_init(|| async { Err(()) }).await.clone()
+            }
+        };
+        match fetched {
             Ok(Some(data)) => respond(
                 ctx,
                 Body3 {
